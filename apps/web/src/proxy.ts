@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 const publicRoutes = ["/", "/login", "/register", "/blog", "/roadmap", "/contributors", "/sponsors", "/changelog", "/privacy", "/terms", "/brand"];
 const authRoutes = ["/login", "/register"];
 
-export async function middleware(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const sessionToken = request.cookies.get("better-auth.session_token")?.value;
 
@@ -25,5 +25,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\..*)(.*))]",
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\..*).*)"],
 };
