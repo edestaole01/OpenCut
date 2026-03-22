@@ -1,18 +1,29 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-export async function proxy() {
-	return NextResponse.next();
+const publicRoutes = ["/", "/login", "/register", "/blog", "/roadmap", "/contributors", "/sponsors", "/changelog", "/privacy", "/terms", "/brand"];
+const authRoutes = ["/login", "/register"];
+
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const sessionToken = request.cookies.get("better-auth.session_token")?.value;
+
+  const isPublicRoute = publicRoutes.some(route =>
+    pathname === route || pathname.startsWith(`${route}/`)
+  );
+  const isAuthRoute = authRoutes.some(route => pathname.startsWith(route));
+
+  if (!sessionToken && !isPublicRoute) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  if (sessionToken && isAuthRoute) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {
-	matcher: [
-		/*
-		 * Match all request paths except for the ones starting with:
-		 * - api (API routes)
-		 * - _next/static (static files)
-		 * - _next/image (image optimization files)
-		 * - favicon.ico (favicon file)
-		 */
-		"/((?!api|_next/static|_next/image|favicon.ico).*)",
-	],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\..*)(.*))]",
 };
