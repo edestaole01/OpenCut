@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Video, Scissors, Share2,
-  BarChart2, Settings, Users, LogOut, Zap
+  BarChart2, Settings, Users, LogOut, Zap,
+  Building2, UserCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -18,6 +19,11 @@ const menuItems = [
   { icon: Scissors, label: "Editor", href: "/projects" },
   { icon: Share2, label: "Redes Sociais", href: "/dashboard/redes-sociais" },
   { icon: BarChart2, label: "Analytics", href: "/dashboard/analytics" },
+];
+
+const configItems = [
+  { icon: Building2, label: "Empresa", href: "/dashboard/empresa" },
+  { icon: UserCircle, label: "Personagens", href: "/dashboard/personagens" },
   { icon: Settings, label: "Configurações", href: "/dashboard/configuracoes" },
 ];
 
@@ -62,12 +68,27 @@ export function Sidebar() {
           </Link>
         ))}
 
+        <div className="pt-4 pb-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase px-3">Configurações</p>
+        </div>
+        {configItems.map((item) => (
+          <Link key={item.href} href={item.href}>
+            <div className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer",
+              pathname === item.href
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            )}>
+              <item.icon className="w-4 h-4" />
+              {item.label}
+            </div>
+          </Link>
+        ))}
+
         {isAdmin && (
           <>
             <div className="pt-4 pb-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase px-3">
-                Administração
-              </p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase px-3">Administração</p>
             </div>
             {adminItems.map((item) => (
               <Link key={item.href} href={item.href}>
