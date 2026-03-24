@@ -19,21 +19,49 @@ import { ThemeToggle } from "../theme-toggle";
 import { DEFAULT_LOGO_URL, SOCIAL_LINKS } from "@/constants/site-constants";
 import { toast } from "sonner";
 import { useEditor } from "@/hooks/use-editor";
-import { CommandIcon, Logout05Icon } from "@hugeicons/core-free-icons";
+import { CommandIcon, Logout05Icon, ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ShortcutsDialog } from "./dialogs/shortcuts-dialog";
 import Image from "next/image";
 import { cn } from "@/utils/ui";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "../ui/tooltip";
 
 export function EditorHeader() {
 	return (
-		<header className="bg-background flex h-[3.4rem] items-center justify-between px-3 pt-0.5">
+		<header className="bg-background flex h-[3.4rem] items-center justify-between px-3 pt-0.5 border-b">
 			<div className="flex items-center gap-1">
+				<TooltipProvider>
+					<Tooltip delayDuration={300}>
+						<TooltipTrigger asChild>
+							<Link href="/dashboard">
+								<Button variant="ghost" size="icon" className="rounded-sm size-8 text-muted-foreground hover:text-foreground">
+									<HugeiconsIcon icon={ArrowLeft01Icon} className="size-4" />
+								</Button>
+							</Link>
+						</TooltipTrigger>
+						<TooltipContent side="bottom">Voltar ao Dashboard</TooltipContent>
+					</Tooltip>
+				</TooltipProvider>
+				<div className="w-px h-5 bg-border mx-0.5" />
 				<ProjectDropdown />
 				<EditableProjectName />
 			</div>
 			<nav className="flex items-center gap-2">
-				<ExportButton />
+				<TooltipProvider>
+					<Tooltip delayDuration={300}>
+						<TooltipTrigger asChild>
+							<span>
+								<ExportButton />
+							</span>
+						</TooltipTrigger>
+						<TooltipContent side="bottom">Exportar vídeo (MP4 / WebM)</TooltipContent>
+					</Tooltip>
+				</TooltipProvider>
 				<ThemeToggle />
 			</nav>
 		</header>
@@ -60,7 +88,7 @@ function ProjectDropdown() {
 			console.error("Failed to prepare project exit:", error);
 		} finally {
 			editor.project.closeProject();
-			router.push("/projects");
+			router.push("/dashboard");
 		}
 	};
 
@@ -92,7 +120,7 @@ function ProjectDropdown() {
 				await editor.project.deleteProjects({
 					ids: [activeProject.metadata.id],
 				});
-				router.push("/projects");
+				router.push("/dashboard");
 			} catch (error) {
 				toast.error("Failed to delete project", {
 					description:
@@ -118,20 +146,20 @@ function ProjectDropdown() {
 						/>
 					</Button>
 				</DropdownMenuTrigger>
-				<DropdownMenuContent align="start" className="z-100 w-44">
+				<DropdownMenuContent align="start" className="z-100 w-48">
 					<DropdownMenuItem
 						onClick={handleExit}
 						disabled={isExiting}
 						icon={<HugeiconsIcon icon={Logout05Icon} />}
 					>
-						Exit project
+						{isExiting ? "Saindo..." : "Sair do projeto"}
 					</DropdownMenuItem>
 
 					<DropdownMenuItem
 						onClick={() => setOpenDialog("shortcuts")}
 						icon={<HugeiconsIcon icon={CommandIcon} />}
 					>
-						Shortcuts
+						Atalhos de teclado
 					</DropdownMenuItem>
 
 					<DropdownMenuSeparator />

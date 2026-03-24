@@ -11,9 +11,9 @@
     "dev:tools": "turbo run dev --filter=@opencut/tools",
     "build:tools": "turbo run build --filter=@opencut/tools",
     "start:tools": "turbo run start --filter=@opencut/tools",
-    "lint:web": "biome lint apps/web/src --max-diagnostics=1000",
-    "lint:web:fix": "biome lint apps/web/src --write --max-diagnostics=1000",
-    "format:web": "biome format apps/web/src/services/renderer --write --max-diagnostics=1000",
+    "lint:web": "bun x @biomejs/biome lint apps/web/src --max-diagnostics=1000",
+    "lint:web:fix": "bun x @biomejs/biome lint apps/web/src --write --max-diagnostics=1000",
+    "format:web": "bun x @biomejs/biome format apps/web/src/services/renderer --write --max-diagnostics=1000",
     "test": "bun test",
     "generate:fonts": "npx tsx apps/web/scripts/generate-font-sprites.ts"
   },

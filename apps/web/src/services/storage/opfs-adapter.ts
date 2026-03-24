@@ -32,7 +32,9 @@ export class OPFSAdapter implements StorageAdapter<File> {
 		const fileHandle = await directory.getFileHandle(key, { create: true });
 		const writable = await fileHandle.createWritable();
 
-		await writable.write(file);
+		// Use ArrayBuffer for better compatibility across browsers
+		const buffer = await file.arrayBuffer();
+		await writable.write(buffer);
 		await writable.close();
 	}
 

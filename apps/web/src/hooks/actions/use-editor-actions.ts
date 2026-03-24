@@ -6,6 +6,9 @@ import { useEditor } from "../use-editor";
 import { useElementSelection } from "../timeline/element/use-element-selection";
 import { useKeyframeSelection } from "../timeline/element/use-keyframe-selection";
 import { getElementsAtTime } from "@/lib/timeline";
+import { detectSilenceFromAudioBuffer } from "@/lib/audio/silence-detector";
+import { createAudioContext } from "@/lib/media/audio";
+import { toast } from "sonner";
 
 export function useEditorActions() {
 	const editor = useEditor();
@@ -334,6 +337,93 @@ export function useEditorActions() {
 		"toggle-ripple-editing",
 		() => {
 			toggleRippleEditing();
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"remove-silences",
+		async () => {
+			if (selectedElements.length === 0) {
+				toast.info("Selecione um ou mais clips para remover silêncios.");
+				return;
+			}
+
+			const toastId = toast.loading("Analisando áudio e removendo silêncios...");
+			
+			try {
+				const editorElements = editor.timeline.getElementsWithTracks({
+					elements: selectedElements,
+				});
+
+				const mediaAssets = editor.media.getAssets();
+				const mediaMap = new Map(mediaAssets.map(a => [a.id, a]));
+				const audioContext = createAudioContext();
+
+				for (const { element, track } of editorElements) {
+					if (element.type !== "video" && element.type !== "audio") continue;
+
+					// 1. Obter o arquivo de mídia
+					const mediaId = "mediaId" in element ? element.mediaId : null;
+					if (!mediaId) continue;
+					const asset = mediaMap.get(mediaId);
+					if (!asset) continue;
+
+					// 2. Decodificar o áudio completo do arquivo
+					const arrayBuffer = await asset.file.arrayBuffer();
+					const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
+
+					// 3. Detectar segmentos de fala
+					const { speechSegments } = await detectSilenceFromAudioBuffer(audioBuffer);
+
+					if (speechSegments.length <= 1) continue;
+
+					// 4. Filtrar segmentos que estão dentro do trim atual do clip
+					const elementTrimStart = element.trimStart;
+					const elementDuration = element.duration;
+					const elementTrimEnd = elementTrimStart + elementDuration;
+
+					const activeSpeechSegments = speechSegments
+						.filter(s => s.end > elementTrimStart && s.start < elementTrimEnd)
+						.map(s => ({
+							start: Math.max(s.start, elementTrimStart),
+							end: Math.min(s.end, elementTrimEnd)
+						}));
+
+					if (activeSpeechSegments.length <= 1) continue;
+
+					// 5. Substituir o clip original pelos novos segmentos de fala
+					const { id: _id, ...baseElement } = element;
+					let currentStartTime = element.startTime;
+					const newElements = activeSpeechSegments.map((segment) => {
+						const segmentDuration = segment.end - segment.start;
+						const newElement = {
+							...baseElement,
+							startTime: currentStartTime,
+							trimStart: segment.start,
+							duration: segmentDuration,
+						};
+						currentStartTime += segmentDuration;
+						return newElement;
+					});
+
+					// 6. Atualizar a timeline: remove o original e insere os novos
+					editor.timeline.deleteElements({
+						elements: [{ trackId: track.id, elementId: element.id }],
+					});
+					newElements.forEach((newElement) => {
+						editor.timeline.insertElement({
+							placement: { mode: "explicit", trackId: track.id },
+							element: newElement,
+						});
+					});
+				}
+
+				toast.success("Silêncios removidos com sucesso!", { id: toastId });
+			} catch (err) {
+				console.error("Silence removal failed:", err);
+				toast.error("Erro ao processar silêncios.", { id: toastId });
+			}
 		},
 		undefined,
 	);

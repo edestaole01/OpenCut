@@ -5,26 +5,25 @@ import { type Tab, useAssetsPanelStore } from "@/stores/assets-panel-store";
 import { TabBar } from "./tabbar";
 import { Captions } from "./views/captions";
 import { MediaView } from "./views/assets";
+import { StockView } from "./views/stock";
 import { SettingsView } from "./views/settings";
 import { SoundsView } from "./views/sounds";
 import { StickersView } from "./views/stickers";
 import { TextView } from "./views/text";
 import { EffectsView } from "./views/effects";
+import { TransitionsView } from "./views/transitions";
 
 export function AssetsPanel() {
 	const { activeTab } = useAssetsPanelStore();
 
 	const viewMap: Record<Tab, React.ReactNode> = {
 		media: <MediaView />,
+		stock: <StockView />,
 		sounds: <SoundsView />,
 		text: <TextView />,
 		stickers: <StickersView />,
 		effects: <EffectsView />,
-		transitions: (
-			<div className="text-muted-foreground p-4">
-				Transitions view coming soon...
-			</div>
-		),
+		transitions: <TransitionsView />,
 		captions: <Captions />,
 		filters: (
 			<div className="text-muted-foreground p-4">

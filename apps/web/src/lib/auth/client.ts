@@ -1,6 +1,4 @@
 import { createAuthClient } from "better-auth/react";
-import { webEnv } from "@opencut/env/web";
 
-export const { signIn, signUp, signOut, useSession } = createAuthClient({
-	baseURL: webEnv.NEXT_PUBLIC_SITE_URL,
-});
+// baseURL not set = uses current browser origin automatically (works on any port)
+export const { signIn, signUp, signOut, useSession } = createAuthClient({});

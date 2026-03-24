@@ -121,6 +121,7 @@ export function BlendingSection({
 		baseOpacity: element.opacity,
 		animations: element.animations,
 		localTime,
+		elementDuration: element.duration,
 	});
 
 	const opacity = useKeyframedNumberProperty({

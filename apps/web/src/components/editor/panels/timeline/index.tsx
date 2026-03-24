@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
 	Delete02Icon,
@@ -17,7 +18,7 @@ import {
 	ContextMenuTrigger,
 } from "../../../ui/context-menu";
 import { useTimelineZoom } from "@/hooks/timeline/use-timeline-zoom";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { TimelineTrackContent } from "./timeline-track";
 import { TimelinePlayhead } from "./timeline-playhead";
 import { SelectionBox } from "../../selection-box";
@@ -54,6 +55,7 @@ import { useEditor } from "@/hooks/use-editor";
 import { useTimelinePlayhead } from "@/hooks/timeline/use-timeline-playhead";
 import { DragLine } from "./drag-line";
 import { invokeAction } from "@/lib/actions";
+import { SelectionOverlay } from "./selection-overlay";
 
 const TRACKS_CONTAINER_MAX_HEIGHT = 800;
 const FALLBACK_CONTAINER_WIDTH = 1000;
@@ -61,6 +63,7 @@ const FALLBACK_CONTAINER_WIDTH = 1000;
 export function Timeline() {
 	const tracksContainerHeight = { min: 0, max: TRACKS_CONTAINER_MAX_HEIGHT };
 	const snappingEnabled = useTimelineStore((s) => s.snappingEnabled);
+	const isBladeModeEnabled = useTimelineStore((s) => s.isBladeModeEnabled);
 	const { clearElementSelection, setElementSelection } = useElementSelection();
 	const editor = useEditor();
 	const timeline = editor.timeline;
@@ -170,6 +173,13 @@ export function Timeline() {
 		tracksScrollRef,
 		zoomLevel,
 	});
+
+	// #2 – preview durante drag: move o playhead para o tempo atual do elemento
+	useEffect(() => {
+		if (dragState.isDragging && dragState.currentTime != null) {
+			editor.playback.seek({ time: dragState.currentTime });
+		}
+	}, [dragState.isDragging, dragState.currentTime, editor.playback]);
 
 	const containerWidth = tracksContainerRef.current?.clientWidth || FALLBACK_CONTAINER_WIDTH;
 	const contentWidth =
@@ -317,7 +327,10 @@ export function Timeline() {
 					</div>
 
 					<div
-						className="relative flex flex-1 flex-col overflow-hidden"
+						className={cn(
+							"relative flex flex-1 flex-col overflow-hidden",
+							isBladeModeEnabled ? "cursor-crosshair" : "",
+						)}
 						ref={tracksContainerRef}
 					>
 						<SelectionBox
@@ -408,6 +421,10 @@ export function Timeline() {
 									isSnappingToPlayhead={
 										showSnapIndicator && currentSnapPoint?.type === "playhead"
 									}
+								/>
+								<SelectionOverlay
+									zoomLevel={zoomLevel}
+									tracksScrollRef={tracksScrollRef}
 								/>
 								<div
 									className="relative"

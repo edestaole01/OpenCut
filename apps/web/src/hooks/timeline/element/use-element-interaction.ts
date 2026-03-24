@@ -166,6 +166,7 @@ export function useElementInteraction({
 }: UseElementInteractionProps) {
 	const editor = useEditor();
 	const rippleEditingEnabled = useTimelineStore((s) => s.rippleEditingEnabled);
+	const isBladeModeEnabled = useTimelineStore((s) => s.isBladeModeEnabled);
 	const isShiftHeldRef = useShiftKey();
 	const tracks = editor.timeline.getTracks();
 	const {
@@ -541,6 +542,28 @@ export function useElementInteraction({
 		event.stopPropagation();
 		mouseDownLocationRef.current = { x: event.clientX, y: event.clientY };
 
+		if (isBladeModeEnabled) {
+			const activeProject = editor.project.getActive();
+			if (!activeProject) return;
+
+			const clickOffsetTime = getClickOffsetTime({
+				clientX: event.clientX,
+				elementRect: event.currentTarget.getBoundingClientRect(),
+				zoomLevel,
+			});
+			const splitTime = snapTimeToFrame({
+				time: element.startTime + clickOffsetTime,
+				fps: activeProject.settings.fps,
+			});
+
+			editor.timeline.splitElements({
+				elements: [{ trackId: track.id, elementId: element.id }],
+				splitTime,
+				rippleEnabled: rippleEditingEnabled,
+			});
+			return;
+		}
+
 		const isMultiSelect = event.metaKey || event.ctrlKey || event.shiftKey;
 
 		if (isMultiSelect) {
@@ -566,7 +589,14 @@ export function useElementInteraction({
 			};
 			setIsPendingDrag(true);
 		},
-		[zoomLevel, isElementSelected, handleSelectionClick],
+		[
+			zoomLevel,
+			isElementSelected,
+			handleSelectionClick,
+			editor,
+			isBladeModeEnabled,
+			rippleEditingEnabled,
+		],
 	);
 
 	const handleElementClick = useCallback(

@@ -35,7 +35,7 @@ export default function DashboardPage() {
                   Modo Rápido com IA
                 </Button>
               </Link>
-              <Link href="/projects">
+              <Link href="/dashboard/projetos">
                 <Button size="lg" variant="outline" className="gap-2">
                   <Video className="w-4 h-4" />
                   Editor Manual
@@ -82,7 +82,7 @@ export default function DashboardPage() {
         </Card>
 
         <Card className="hover:border-primary/50 transition-colors cursor-pointer">
-          <Link href="/dashboard/configuracoes">
+          <Link href="/dashboard/projetos">
             <CardHeader>
               <div className="w-10 h-10 bg-green-500/10 rounded-lg flex items-center justify-center mb-2">
                 <Video className="w-5 h-5 text-green-500" />

@@ -1,5 +1,6 @@
 "use client";
 
+import { memo, useMemo } from "react";
 import { useEditor } from "@/hooks/use-editor";
 import { useAssetsPanelStore } from "@/stores/assets-panel-store";
 import AudioWaveform from "./audio-waveform";
@@ -60,6 +61,7 @@ import type { SelectedKeyframeRef, ElementKeyframe } from "@/types/animation";
 import { cn } from "@/utils/ui";
 import { Button } from "@/components/ui/button";
 import { usePropertiesStore } from "@/stores/properties-store";
+import { useFadeVolumeInteraction } from "@/hooks/timeline/element/use-fade-volume-interaction";
 
 const KEYFRAME_INDICATOR_MIN_WIDTH_PX = 40;
 const ELEMENT_RING_WIDTH_PX = 1.5;
@@ -183,7 +185,7 @@ interface TimelineElementProps {
 	isDropTarget?: boolean;
 }
 
-export function TimelineElement({
+export const TimelineElement = memo(function TimelineElement({
 	element,
 	track,
 	zoomLevel,
@@ -199,13 +201,17 @@ export function TimelineElement({
 	const { selectedElements } = useElementSelection();
 	const { requestRevealMedia } = useAssetsPanelStore();
 
-	let mediaAsset: MediaAsset | null = null;
+	// #3 – cache assets in a Map to avoid O(n) find on every render
+	const allAssets = editor.media.getAssets();
+	const assetsMap = useMemo(() => {
+		const map = new Map<string, MediaAsset>();
+		for (const a of allAssets) map.set(a.id, a);
+		return map;
+	}, [allAssets]);
 
-	if (hasMediaId(element)) {
-		mediaAsset =
-			editor.media.getAssets().find((asset) => asset.id === element.mediaId) ??
-			null;
-	}
+	const mediaAsset: MediaAsset | null = hasMediaId(element)
+		? (assetsMap.get(element.mediaId) ?? null)
+		: null;
 
 	const hasAudio = mediaSupportsAudio({ media: mediaAsset });
 
@@ -242,17 +248,22 @@ export function TimelineElement({
 		time: displayedStartTime,
 		zoomLevel,
 	});
-	const keyframeIndicators = isSelected
-		? getKeyframeIndicators({
-				keyframes: getElementKeyframes({ animations: element.animations }),
-				trackId: track.id,
-				elementId: element.id,
-				displayedStartTime,
-				zoomLevel,
-				elementLeft,
-				elementWidth,
-			})
-		: [];
+	// #4 – memoize keyframe calculation (O(n) per render without this)
+	const keyframeIndicators = useMemo(
+		() =>
+			isSelected
+				? getKeyframeIndicators({
+						keyframes: getElementKeyframes({ animations: element.animations }),
+						trackId: track.id,
+						elementId: element.id,
+						displayedStartTime,
+						zoomLevel,
+						elementLeft,
+						elementWidth,
+					})
+				: [],
+		[isSelected, element.animations, track.id, element.id, displayedStartTime, zoomLevel, elementLeft, elementWidth],
+	);
 
 	const {
 		keyframeDragState,
@@ -283,14 +294,22 @@ export function TimelineElement({
 								: undefined,
 					}}
 				>
+					{/* #5 – tooltip de duração durante resize */}
+					{isResizing && (
+						<div className="pointer-events-none absolute -top-6 left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground shadow">
+							{currentDuration.toFixed(2)}s
+						</div>
+					)}
 					<ElementInner
 						element={element}
 						track={track}
 						isSelected={isSelected}
+						hasAudio={hasAudio}
 						onElementClick={onElementClick}
 						onElementMouseDown={onElementMouseDown}
 						handleResizeStart={handleResizeStart}
 						isDropTarget={isDropTarget}
+						zoomLevel={zoomLevel}
 					/>
 					{isSelected && (
 						<div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -365,12 +384,29 @@ export function TimelineElement({
 			</ContextMenuContent>
 		</ContextMenu>
 	);
-}
+}, (prev, next) => {
+	// Skip re-render for elements not involved in the current drag
+	const prevDraggingThis = prev.dragState.elementId === prev.element.id && prev.dragState.isDragging;
+	const nextDraggingThis = next.dragState.elementId === next.element.id && next.dragState.isDragging;
+	if (!prevDraggingThis && !nextDraggingThis) {
+		return (
+			prev.element === next.element &&
+			prev.track === next.track &&
+			prev.zoomLevel === next.zoomLevel &&
+			prev.isSelected === next.isSelected &&
+			prev.isDropTarget === next.isDropTarget
+		);
+	}
+	return false; // always re-render if being dragged
+});
+TimelineElement.displayName = "TimelineElement";
 
 function ElementInner({
 	element,
 	track,
 	isSelected,
+	hasAudio,
+	zoomLevel,
 	onElementClick,
 	onElementMouseDown,
 	handleResizeStart,
@@ -379,6 +415,8 @@ function ElementInner({
 	element: TimelineElementType;
 	track: TimelineTrack;
 	isSelected: boolean;
+	hasAudio: boolean;
+	zoomLevel: number;
 	onElementClick: (
 		event: React.MouseEvent,
 		element: TimelineElementType,
@@ -402,9 +440,22 @@ function ElementInner({
 		(state) => state.closeClipEffects,
 	);
 
+	const { handleMouseDown: handleFadeVolumeMouseDown } = useFadeVolumeInteraction({
+		element,
+		trackId: track.id,
+		zoomLevel,
+	});
+
+	const fadeInWidth = timelineTimeToPixels({ time: element.fadeIn || 0, zoomLevel });
+	const fadeOutWidth = timelineTimeToPixels({ time: element.fadeOut || 0, zoomLevel });
+	const trackHeight = getTrackHeight({ type: track.type });
+	const volumeY = (element.type === "audio" || hasAudio) && "volume" in element
+		? (1 - (element.volume ?? 1) / 2) * trackHeight 
+		: null;
+
 	return (
 		<div
-			className="relative h-full cursor-pointer"
+			className="relative h-full cursor-pointer group/element"
 			style={{ marginInline: ELEMENT_RING_WIDTH_PX }}
 		>
 			<div
@@ -421,6 +472,20 @@ function ElementInner({
 						: undefined
 				}
 			>
+				{/* Fades Visualization */}
+				{element.fadeIn && (
+					<div 
+						className="absolute top-0 bottom-0 left-0 bg-black/20 pointer-events-none"
+						style={{ width: fadeInWidth, clipPath: 'polygon(0 100%, 100% 0, 0 0)' }}
+					/>
+				)}
+				{element.fadeOut && (
+					<div 
+						className="absolute top-0 bottom-0 right-0 bg-black/20 pointer-events-none"
+						style={{ width: fadeOutWidth, clipPath: 'polygon(0 0, 100% 0, 100% 100%)' }}
+					/>
+				)}
+
 				<button
 					type="button"
 					className="absolute inset-0 size-full cursor-pointer flex flex-col"
@@ -438,7 +503,39 @@ function ElementInner({
 						/>
 					</div>
 				</button>
+
+				{/* Volume Line */}
+				{isSelected && volumeY !== null && (
+					<button
+						type="button"
+						className="absolute left-0 right-0 h-0.5 bg-white/50 cursor-ns-resize hover:bg-white z-40"
+						style={{ top: volumeY }}
+						onMouseDown={(e) => handleFadeVolumeMouseDown(e, "volume")}
+					/>
+				)}
 			</div>
+
+			{/* Fade Handles */}
+			{isSelected && (
+				<>
+					<button
+						type="button"
+						className="absolute top-0 size-3 -translate-x-1/2 cursor-ew-resize z-50 flex items-center justify-center group/fade-in"
+						style={{ left: fadeInWidth }}
+						onMouseDown={(e) => handleFadeVolumeMouseDown(e, "fadeIn")}
+					>
+						<div className="size-1.5 rounded-full bg-white border border-black/50 group-hover/fade-in:scale-125 transition-transform" />
+					</button>
+					<button
+						type="button"
+						className="absolute top-0 size-3 translate-x-1/2 cursor-ew-resize z-50 flex items-center justify-center group/fade-out"
+						style={{ right: fadeOutWidth }}
+						onMouseDown={(e) => handleFadeVolumeMouseDown(e, "fadeOut")}
+					>
+						<div className="size-1.5 rounded-full bg-white border border-black/50 group-hover/fade-out:scale-125 transition-transform" />
+					</button>
+				</>
+			)}
 
 			{element.type !== "audio" && element.type !== "effect" && (
 				<div className="sticky left-1 mt-1 ml-1 w-fit">

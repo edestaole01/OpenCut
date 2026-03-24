@@ -95,6 +95,10 @@ interface BaseTimelineElement {
 	trimEnd: number;
 	sourceDuration?: number;
 	animations?: ElementAnimations;
+	fadeIn?: number;
+	fadeOut?: number;
+	transitionIn?: { type: string; duration: number; params?: EffectParamValues };
+	transitionOut?: { type: string; duration: number; params?: EffectParamValues };
 }
 
 export interface VideoElement extends BaseTimelineElement {
@@ -173,7 +177,9 @@ export type VisualElement =
 export type ElementUpdatePatch =
 	| { transform: Transform }
 	| { opacity: number }
-	| { volume: number };
+	| { volume: number }
+	| { fadeIn: number }
+	| { fadeOut: number };
 
 export type TimelineElement =
 	| AudioElement

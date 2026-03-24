@@ -50,7 +50,7 @@ export function SnapIndicator({
 				width: `${TIMELINE_INDICATOR_LINE_WIDTH_PX}px`,
 			}}
 		>
-			<div className={"bg-primary/40 h-full w-0.5 opacity-80"} />
+			<div className={"bg-yellow-400 dark:bg-yellow-300 h-full w-[2px] shadow-[0_0_4px_rgba(250,204,21,0.6)]"} />
 		</div>
 	);
 }

@@ -251,6 +251,37 @@ export function useTimelinePlayhead({
 		isPlaying,
 	]);
 
+	useEffect(() => {
+		const playhead = playheadRef?.current;
+		if (!playhead) return;
+
+		const updatePosition = (time: number) => {
+			const centerPosition = time * TIMELINE_CONSTANTS.PIXELS_PER_SECOND * zoomLevel;
+			const leftPosition = centerPosition - 1; // Compensação de largura
+			playhead.style.left = `${leftPosition}px`;
+		};
+
+		const handlePlaybackUpdate = (event: any) => {
+			if (isScrubbing) return;
+			updatePosition(event.detail.time);
+		};
+
+		const handlePlaybackSeek = (event: any) => {
+			updatePosition(event.detail.time);
+		};
+
+		window.addEventListener("playback-update", handlePlaybackUpdate);
+		window.addEventListener("playback-seek", handlePlaybackSeek);
+
+		// Posição inicial
+		updatePosition(currentTime);
+
+		return () => {
+			window.removeEventListener("playback-update", handlePlaybackUpdate);
+			window.removeEventListener("playback-seek", handlePlaybackSeek);
+		};
+	}, [zoomLevel, playheadRef, isScrubbing, currentTime]);
+
 	return {
 		playheadPosition,
 		handlePlayheadMouseDown: handlePlayheadMouseDownEvent,

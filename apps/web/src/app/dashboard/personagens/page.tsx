@@ -1,13 +1,14 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Plus, Trash2, Save } from "lucide-react";
+import { Users, Plus, Trash2, Save, Loader2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { nanoid } from "nanoid";
 
 interface Character {
   id: string;
@@ -17,16 +18,41 @@ interface Character {
   instagram: string;
 }
 
+const roles = [
+  "CEO / Fundador", "Diretor", "Gerente", "Especialista",
+  "Consultor", "Palestrante", "Influenciador", "Apresentador", "Outro"
+];
+
 export default function PersonagensPage() {
-  const [characters, setCharacters] = useState<Character[]>([
-    { id: "1", name: "", role: "", linkedin: "", instagram: "" }
-  ]);
+  const [characters, setCharacters] = useState<Character[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [fetching, setFetching] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/speakers")
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setCharacters(data.map((s: any) => ({
+            id: s.id,
+            name: s.name || "",
+            role: s.role || "",
+            linkedin: s.linkedin || "",
+            instagram: s.instagram || "",
+          })));
+        } else {
+          setCharacters([{ id: nanoid(), name: "", role: "", linkedin: "", instagram: "" }]);
+        }
+      })
+      .catch(() => {
+        setCharacters([{ id: nanoid(), name: "", role: "", linkedin: "", instagram: "" }]);
+      })
+      .finally(() => setFetching(false));
+  }, []);
 
   const addCharacter = () => {
-    setCharacters([...characters, {
-      id: Date.now().toString(),
-      name: "", role: "", linkedin: "", instagram: ""
-    }]);
+    setCharacters([...characters, { id: nanoid(), name: "", role: "", linkedin: "", instagram: "" }]);
   };
 
   const removeCharacter = (id: string) => {
@@ -38,14 +64,39 @@ export default function PersonagensPage() {
     setCharacters(characters.map(c => c.id === id ? { ...c, [field]: value } : c));
   };
 
-  const handleSave = () => {
-    toast.success("Personagens salvos com sucesso!");
+  const handleSave = async () => {
+    const valid = characters.filter(c => c.name.trim());
+    if (valid.length === 0) { toast.error("Adicione pelo menos um personagem com nome"); return; }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/speakers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ speakersList: valid }),
+      });
+      if (!res.ok) throw new Error("Erro ao salvar");
+      const saved_list = await res.json();
+      setCharacters(saved_list.map((s: any) => ({
+        id: s.id, name: s.name || "", role: s.role || "",
+        linkedin: s.linkedin || "", instagram: s.instagram || "",
+      })));
+      setSaved(true);
+      toast.success("Personagens salvos!");
+      setTimeout(() => setSaved(false), 3000);
+    } catch {
+      toast.error("Erro ao salvar personagens");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const roles = [
-    "CEO / Fundador", "Diretor", "Gerente", "Especialista",
-    "Consultor", "Palestrante", "Influenciador", "Apresentador", "Outro"
-  ];
+  if (fetching) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 max-w-2xl">
@@ -80,7 +131,7 @@ export default function PersonagensPage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Nome completo</Label>
+                  <Label>Nome completo *</Label>
                   <Input
                     placeholder="Ex: João Silva"
                     value={character.name}
@@ -93,18 +144,13 @@ export default function PersonagensPage() {
                     value={character.role}
                     onValueChange={(v) => updateCharacter(character.id, "role", v)}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                     <SelectContent>
-                      {roles.map((r) => (
-                        <SelectItem key={r} value={r}>{r}</SelectItem>
-                      ))}
+                      {roles.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>LinkedIn</Label>
@@ -129,13 +175,13 @@ export default function PersonagensPage() {
       </div>
 
       <Button variant="outline" className="w-full" onClick={addCharacter}>
-        <Plus className="w-4 h-4 mr-2" />
-        Adicionar personagem
+        <Plus className="w-4 h-4 mr-2" />Adicionar personagem
       </Button>
 
-      <Button className="w-full" onClick={handleSave}>
-        <Save className="w-4 h-4 mr-2" />
-        Salvar Personagens
+      <Button className="w-full gap-2" onClick={handleSave} disabled={loading}>
+        {loading ? <><Loader2 className="w-4 h-4 animate-spin" />Salvando...</> :
+         saved ? <><CheckCircle2 className="w-4 h-4" />Salvo!</> :
+         <><Save className="w-4 h-4" />Salvar Personagens</>}
       </Button>
     </div>
   );

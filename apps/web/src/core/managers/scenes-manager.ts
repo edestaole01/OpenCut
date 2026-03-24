@@ -302,7 +302,9 @@ export class ScenesManager {
 	}
 
 	private notify(): void {
-		this.listeners.forEach((fn) => fn());
+		this.listeners.forEach((fn) => {
+			fn();
+		});
 	}
 
 	updateSceneTracks({ tracks }: { tracks: TimelineTrack[] }): void {

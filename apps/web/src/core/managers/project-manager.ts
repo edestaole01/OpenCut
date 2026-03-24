@@ -80,6 +80,7 @@ export class ProjectManager {
 	}
 
 	async createNewProject({ name }: { name: string }): Promise<string> {
+		this.editor.save.pause();
 		const mainScene = buildDefaultScene({ name: "Main scene", isMain: true });
 		const newProject: TProject = {
 			metadata: {
@@ -120,6 +121,8 @@ export class ProjectManager {
 		} catch (error) {
 			toast.error("Failed to save new project");
 			throw error;
+		} finally {
+			this.editor.save.resume();
 		}
 	}
 
@@ -665,6 +668,8 @@ export class ProjectManager {
 	}
 
 	private notify(): void {
-		this.listeners.forEach((fn) => fn());
+		this.listeners.forEach((fn) => {
+			fn();
+		});
 	}
 }

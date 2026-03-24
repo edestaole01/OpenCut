@@ -3,6 +3,24 @@ import { withBotId } from "botid/next/config";
 import { withContentCollections } from "@content-collections/next";
 
 const nextConfig: NextConfig = {
+	async headers() {
+		return [
+			{
+				source: "/editor/(.*)",
+				headers: [
+					{ key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+					{ key: "Cross-Origin-Embedder-Policy", value: "credentialless" },
+				],
+			},
+			{
+				source: "/dashboard/ai-studio/(.*)",
+				headers: [
+					{ key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+					{ key: "Cross-Origin-Embedder-Policy", value: "credentialless" },
+				],
+			},
+		];
+	},
 	turbopack: {
 		rules: {
 			"*.glsl": {

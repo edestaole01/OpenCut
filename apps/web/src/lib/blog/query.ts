@@ -16,6 +16,15 @@ const url =
 	process.env.NEXT_PUBLIC_MARBLE_API_URL ?? "https://api.marblecms.com";
 const key = process.env.MARBLE_WORKSPACE_KEY ?? "cmd4iw9mm0006l804kwqv0k46";
 
+const EMPTY_PAGINATION = {
+	limit: 0,
+	currpage: 1,
+	nextPage: null,
+	prevPage: null,
+	totalItems: 0,
+	totalPages: 0,
+};
+
 async function fetchFromMarble<T>({
 	endpoint,
 }: {
@@ -36,7 +45,15 @@ async function fetchFromMarble<T>({
 }
 
 export async function getPosts() {
-	return fetchFromMarble<MarblePostList>({ endpoint: "posts" });
+	try {
+		return await fetchFromMarble<MarblePostList>({ endpoint: "posts" });
+	} catch (error) {
+		console.warn("Falling back to empty post list:", error);
+		return {
+			posts: [],
+			pagination: EMPTY_PAGINATION,
+		};
+	}
 }
 
 export async function getTags() {

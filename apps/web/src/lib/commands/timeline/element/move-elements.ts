@@ -101,19 +101,12 @@ export class MoveElementCommand extends Command {
 		const isSameTrack = this.sourceTrackId === this.targetTrackId;
 
 		let updatedTracks = tracksToUpdate.map((track): TimelineTrack => {
-			if (isSameTrack && track.id === this.sourceTrackId) {
-				return {
-					...track,
-					elements: track.elements.map((trackElement) =>
-						trackElement.id === this.elementId ? movedElement : trackElement,
-					),
-				} as typeof track;
-			}
-
 			if (track.id === this.sourceTrackId) {
+				// Remove element and close gap
 				const remainingElements = track.elements.filter(
 					(trackElement) => trackElement.id !== this.elementId,
 				);
+				
 				const shiftedElements = this.rippleEnabled
 					? rippleShiftElements({
 							elements: remainingElements,
@@ -121,13 +114,42 @@ export class MoveElementCommand extends Command {
 							shiftAmount: element.duration,
 						})
 					: remainingElements;
+
+				if (isSameTrack) {
+					// In same track, we now need to insert it back at the new position
+					const elementsAfterRemoval = shiftedElements;
+					
+					// If ripple is enabled, we push elements at the target position to make room
+					const targetElements = this.rippleEnabled
+						? rippleShiftElements({
+								elements: elementsAfterRemoval,
+								afterTime: adjustedStartTime,
+								shiftAmount: -element.duration, // Negative shift pushes forward
+							})
+						: elementsAfterRemoval;
+
+					return { 
+						...track, 
+						elements: [...targetElements, movedElement] 
+					} as typeof track;
+				}
+
 				return { ...track, elements: shiftedElements } as typeof track;
 			}
 
 			if (track.id === this.targetTrackId) {
+				// Different track - push elements to make room and insert
+				const targetElements = this.rippleEnabled
+					? rippleShiftElements({
+							elements: track.elements,
+							afterTime: adjustedStartTime,
+							shiftAmount: -element.duration,
+						})
+					: track.elements;
+
 				return {
 					...track,
-					elements: [...track.elements, movedElement],
+					elements: [...targetElements, movedElement],
 				} as typeof track;
 			}
 

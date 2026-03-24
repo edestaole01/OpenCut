@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditor } from "@/hooks/use-editor";
 import { useShiftKey } from "@/hooks/use-shift-key";
+import { useTimelineStore } from "@/stores/timeline-store";
 import type { TextElement, Transform } from "@/types/timeline";
 import { getVisibleElementsWithBounds } from "@/lib/preview/element-bounds";
 import { hitTest } from "@/lib/preview/hit-test";
@@ -29,6 +30,7 @@ interface DragState {
 		elementId: string;
 		initialTransform: Transform;
 	}>;
+	lastSnappedDelta?: { x: number; y: number };
 }
 
 export function usePreviewInteraction({
@@ -38,6 +40,7 @@ export function usePreviewInteraction({
 }) {
 	const editor = useEditor();
 	const isShiftHeldRef = useShiftKey();
+	const autoKeyframingEnabled = useTimelineStore((s) => s.autoKeyframingEnabled);
 	const [isDragging, setIsDragging] = useState(false);
 	const [snapLines, setSnapLines] = useState<SnapLine[]>([]);
 	const [editingText, setEditingText] = useState<{
@@ -260,6 +263,8 @@ export function usePreviewInteraction({
 			const deltaSnappedY =
 				snappedPosition.y - firstElement.initialTransform.position.y;
 
+			dragStateRef.current.lastSnappedDelta = { x: deltaSnappedX, y: deltaSnappedY };
+
 			const updates = dragStateRef.current.elements.map(
 				({ trackId, elementId, initialTransform }) => ({
 					trackId,
@@ -285,23 +290,39 @@ export function usePreviewInteraction({
 		({ clientX, clientY, currentTarget, pointerId }: React.PointerEvent) => {
 			if (!dragStateRef.current || !isDragging || !canvasRef.current) return;
 
-			const currentPos = screenToCanvas({
-				clientX,
-				clientY,
-				canvas: canvasRef.current,
-			});
+			const deltaX = dragStateRef.current.lastSnappedDelta?.x ?? 0;
+			const deltaY = dragStateRef.current.lastSnappedDelta?.y ?? 0;
 
-			const deltaX = currentPos.x - dragStateRef.current.startX;
-			const deltaY = currentPos.y - dragStateRef.current.startY;
-
-			const hasMovement =
-				Math.abs(deltaX) > MIN_DRAG_DISTANCE ||
-				Math.abs(deltaY) > MIN_DRAG_DISTANCE;
+			const hasMovement = Math.abs(deltaX) > 0 || Math.abs(deltaY) > 0;
 
 			if (!hasMovement) {
 				editor.timeline.discardPreview();
 			} else {
-				editor.timeline.commitPreview();
+				if (autoKeyframingEnabled) {
+					const currentTime = editor.playback.getCurrentTime();
+					const keyframes = dragStateRef.current.elements.flatMap(
+						({ trackId, elementId, initialTransform }) => [
+							{
+								trackId,
+								elementId,
+								propertyPath: "transform.position.x" as any,
+								time: currentTime,
+								value: initialTransform.position.x + deltaX,
+							},
+							{
+								trackId,
+								elementId,
+								propertyPath: "transform.position.y" as any,
+								time: currentTime,
+								value: initialTransform.position.y + deltaY,
+							},
+						],
+					);
+					editor.timeline.upsertKeyframes({ keyframes });
+					editor.timeline.discardPreview();
+				} else {
+					editor.timeline.commitPreview();
+				}
 			}
 
 			dragStateRef.current = null;
@@ -309,7 +330,7 @@ export function usePreviewInteraction({
 			setSnapLines([]);
 			currentTarget.releasePointerCapture(pointerId);
 		},
-		[isDragging, canvasRef, editor],
+		[isDragging, canvasRef, editor, autoKeyframingEnabled],
 	);
 
 	return {

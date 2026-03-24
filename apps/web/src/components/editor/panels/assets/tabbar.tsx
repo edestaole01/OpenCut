@@ -14,6 +14,20 @@ import {
 	useAssetsPanelStore,
 } from "@/stores/assets-panel-store";
 
+// Portuguese labels for tabs
+const PT_LABELS: Record<string, string> = {
+	media: "Mídia",
+	sounds: "Sons",
+	text: "Texto",
+	stickers: "Stickers",
+	effects: "Efeitos",
+	transitions: "Transições",
+	captions: "Legendas",
+	filters: "Filtros",
+	adjustment: "Ajuste",
+	settings: "Config.",
+};
+
 export function TabBar() {
 	const { activeTab, setActiveTab } = useAssetsPanelStore();
 	const [showTopFade, setShowTopFade] = useState(false);
@@ -49,24 +63,27 @@ export function TabBar() {
 		<div className="relative flex">
 			<div
 				ref={scrollRef}
-				className="scrollbar-hidden relative flex size-full p-2 flex-col items-center justify-start gap-1.5 overflow-y-auto"
+				className="scrollbar-hidden relative flex size-full p-1.5 flex-col items-center justify-start gap-0.5 overflow-y-auto"
 			>
 				{TAB_KEYS.map((tabKey) => {
 					const tab = tabs[tabKey];
+					const isActive = activeTab === tabKey;
 					return (
-						<Tooltip key={tabKey} delayDuration={10}>
+						<Tooltip key={tabKey} delayDuration={300}>
 							<TooltipTrigger asChild>
 								<Button
-									variant={activeTab === tabKey ? "secondary" : "text"}
+									variant={isActive ? "secondary" : "text"}
 									aria-label={tab.label}
 									className={cn(
-										"flex-col !p-1.5 !rounded-sm !h-auto [&_svg]:size-4.5",
-										activeTab !== tabKey &&
-											"border border-transparent text-muted-foreground",
+										"flex-col !px-1 !py-1.5 !rounded-md !h-auto !w-full gap-0.5 [&_svg]:size-4",
+										!isActive && "text-muted-foreground hover:text-foreground",
 									)}
 									onClick={() => setActiveTab(tabKey)}
 								>
 									<tab.icon />
+									<span className="text-[9px] font-medium leading-none">
+										{PT_LABELS[tabKey] ?? tab.label}
+									</span>
 								</Button>
 							</TooltipTrigger>
 							<TooltipContent
@@ -76,7 +93,7 @@ export function TabBar() {
 								sideOffset={8}
 							>
 								<div className="text-foreground text-sm leading-none font-medium">
-									{tab.label}
+									{PT_LABELS[tabKey] ?? tab.label}
 								</div>
 							</TooltipContent>
 						</Tooltip>

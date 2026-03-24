@@ -6,7 +6,7 @@ import {
 	TooltipContent,
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { SplitSquareHorizontal } from "lucide-react";
+import { SplitSquareHorizontal, } from "lucide-react";
 import {
 	SplitButton,
 	SplitButtonLeft,
@@ -96,19 +96,19 @@ function ToolbarLeftSection() {
 			<TooltipProvider delayDuration={500}>
 				<ToolbarButton
 					icon={<HugeiconsIcon icon={ScissorIcon} />}
-					tooltip="Split element"
+					tooltip="Cortar clip aqui (S)"
 					onClick={({ event }) => handleAction({ action: "split", event })}
 				/>
 
 				<ToolbarButton
 					icon={<HugeiconsIcon icon={AlignLeftIcon} />}
-					tooltip="Split left"
+					tooltip="Remover parte esquerda (Q)"
 					onClick={({ event }) => handleAction({ action: "split-left", event })}
 				/>
 
 				<ToolbarButton
 					icon={<HugeiconsIcon icon={AlignRightIcon} />}
-					tooltip="Split right"
+					tooltip="Remover parte direita (W)"
 					onClick={({ event }) =>
 						handleAction({ action: "split-right", event })
 					}
@@ -116,14 +116,14 @@ function ToolbarLeftSection() {
 
 				<ToolbarButton
 					icon={<SplitSquareHorizontal />}
-					tooltip="Separate audio (coming soon)"
+					tooltip="Separar áudio (em breve)"
 					disabled={true}
 					onClick={({ event: _event }) => {}}
 				/>
 
 				<ToolbarButton
 					icon={<HugeiconsIcon icon={Copy01Icon} />}
-					tooltip="Duplicate element"
+					tooltip="Duplicar elemento (Ctrl+D)"
 					onClick={({ event }) =>
 						handleAction({ action: "duplicate-selected", event })
 					}
@@ -131,17 +131,23 @@ function ToolbarLeftSection() {
 
 				<ToolbarButton
 					icon={<HugeiconsIcon icon={SnowIcon} />}
-					tooltip="Freeze frame (coming soon)"
+					tooltip="Congelar frame (em breve)"
 					disabled={true}
 					onClick={({ event: _event }) => {}}
 				/>
 
 				<ToolbarButton
 					icon={<HugeiconsIcon icon={Delete02Icon} />}
-					tooltip="Delete element"
+					tooltip="Deletar elemento (Delete)"
 					onClick={({ event }) =>
 						handleAction({ action: "delete-selected", event })
 					}
+				/>
+
+				<ToolbarButton
+					icon={<HugeiconsIcon icon={ScissorIcon} className="text-primary" />}
+					tooltip="Remover silêncios automaticamente"
+					onClick={({ event }) => handleAction({ action: "remove-silences", event })}
 				/>
 
 				<div className="bg-border mx-1 h-6 w-px" />
@@ -149,8 +155,8 @@ function ToolbarLeftSection() {
 				<Tooltip>
 					<ToolbarButton
 						icon={<HugeiconsIcon icon={Bookmark02Icon} />}
-				isActive={isCurrentlyBookmarked}
-					tooltip={isCurrentlyBookmarked ? "Remove bookmark" : "Add bookmark"}
+						isActive={isCurrentlyBookmarked}
+						tooltip={isCurrentlyBookmarked ? "Remover marcador" : "Adicionar marcador"}
 						onClick={({ event }) =>
 							handleAction({ action: "toggle-bookmark", event })
 						}
@@ -193,23 +199,32 @@ function ToolbarRightSection({
 }) {
 	const snappingEnabled = useTimelineStore((s) => s.snappingEnabled);
 	const rippleEditingEnabled = useTimelineStore((s) => s.rippleEditingEnabled);
+	const isBladeModeEnabled = useTimelineStore((s) => s.isBladeModeEnabled);
 	const toggleSnapping = useTimelineStore((s) => s.toggleSnapping);
 	const toggleRippleEditing = useTimelineStore((s) => s.toggleRippleEditing);
+	const toggleBladeMode = useTimelineStore((s) => s.toggleBladeMode);
 
 	return (
 		<div className="flex items-center gap-1">
 			<TooltipProvider delayDuration={500}>
 				<ToolbarButton
+					icon={<HugeiconsIcon icon={ScissorIcon} />}
+					isActive={isBladeModeEnabled}
+					tooltip={isBladeModeEnabled ? "Desativar ferramenta de corte (B)" : "Ativar ferramenta de corte (B)"}
+					onClick={() => toggleBladeMode()}
+				/>
+
+				<ToolbarButton
 					icon={<HugeiconsIcon icon={MagnetIcon} />}
 					isActive={snappingEnabled}
-					tooltip="Auto snapping"
+					tooltip={snappingEnabled ? "Snap ativado (N para desativar)" : "Snap desativado (N para ativar)"}
 					onClick={() => toggleSnapping()}
 				/>
 
 				<ToolbarButton
 					icon={<HugeiconsIcon icon={Link04Icon} className="scale-110" />}
 					isActive={rippleEditingEnabled}
-					tooltip="Ripple editing"
+					tooltip={rippleEditingEnabled ? "Edição em cadeia ativada" : "Edição em cadeia desativada"}
 					onClick={() => toggleRippleEditing()}
 				/>
 			</TooltipProvider>

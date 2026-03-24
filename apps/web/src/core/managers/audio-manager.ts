@@ -251,7 +251,27 @@ export class AudioManager {
 
 			const node = audioContext.createBufferSource();
 			node.buffer = buffer;
-			node.connect(this.masterGain ?? audioContext.destination);
+
+			const gainNode = audioContext.createGain();
+			const baseVolume = clip.volume ?? 1;
+			const fadeIn = clip.fadeIn ?? 0;
+			const fadeOut = clip.fadeOut ?? 0;
+
+			const localTime = timestamp - clip.trimStart;
+			const bufferDuration = buffer.duration;
+
+			const getGainAtTime = (time: number) => {
+				let multiplier = 1;
+				if (time < fadeIn) {
+					multiplier = time / fadeIn;
+				} else if (time > clip.duration - fadeOut) {
+					multiplier = Math.max(0, (clip.duration - time) / fadeOut);
+				}
+				return baseVolume * multiplier;
+			};
+
+			const startGain = getGainAtTime(localTime);
+			const endGain = getGainAtTime(localTime + bufferDuration);
 
 			const startTimestamp =
 				this.playbackStartContextTime +
@@ -259,11 +279,22 @@ export class AudioManager {
 				(timelineTime - this.playbackStartTime);
 
 			if (startTimestamp >= audioContext.currentTime) {
+				gainNode.gain.setValueAtTime(startGain, startTimestamp);
+				gainNode.gain.linearRampToValueAtTime(
+					endGain,
+					startTimestamp + bufferDuration,
+				);
 				node.start(startTimestamp);
 				consecutiveDroppedBufferCount = 0;
 			} else {
 				const offset = audioContext.currentTime - startTimestamp;
-				if (offset < buffer.duration) {
+				if (offset < bufferDuration) {
+					const currentGain = getGainAtTime(localTime + offset);
+					gainNode.gain.setValueAtTime(currentGain, audioContext.currentTime);
+					gainNode.gain.linearRampToValueAtTime(
+						endGain,
+						startTimestamp + bufferDuration,
+					);
 					node.start(audioContext.currentTime, offset);
 					consecutiveDroppedBufferCount = 0;
 				} else {
@@ -293,9 +324,13 @@ export class AudioManager {
 				}
 			}
 
+			node.connect(gainNode);
+			gainNode.connect(this.masterGain ?? audioContext.destination);
+
 			this.queuedSources.add(node);
 			node.addEventListener("ended", () => {
 				node.disconnect();
+				gainNode.disconnect();
 				this.queuedSources.delete(node);
 			});
 

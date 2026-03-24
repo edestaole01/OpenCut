@@ -1,12 +1,98 @@
 "use client";
 
-import { ArrowRightIcon } from "lucide-react";
 import { useState } from "react";
-import ReactMarkdown from "react-markdown";
-import { SOCIAL_LINKS } from "@/constants/site-constants";
 import { useLocalStorage } from "@/hooks/storage/use-local-storage";
 import { Button } from "../ui/button";
-import { Dialog, DialogBody, DialogContent, DialogTitle } from "../ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogTitle } from "../ui/dialog";
+import { ArrowRightIcon, CheckIcon } from "lucide-react";
+
+const STEPS = [
+	{
+		emoji: "🎬",
+		title: "Bem-vindo ao Editor de Vídeo!",
+		description: "Este editor tem 4 áreas principais. Vamos conhecê-las rapidamente.",
+		content: (
+			<div className="grid grid-cols-2 gap-2 mt-3">
+				{[
+					{ area: "① Esquerda", desc: "Abas de mídia, texto, efeitos e configurações", color: "bg-blue-500/10 border-blue-500/30 text-blue-600" },
+					{ area: "② Centro", desc: "Prévia do vídeo — veja o resultado em tempo real", color: "bg-green-500/10 border-green-500/30 text-green-600" },
+					{ area: "③ Direita", desc: "Propriedades do elemento selecionado (posição, cor...)", color: "bg-orange-500/10 border-orange-500/30 text-orange-600" },
+					{ area: "④ Baixo", desc: "Timeline — organize e edite seus clips aqui", color: "bg-purple-500/10 border-purple-500/30 text-purple-600" },
+				].map(item => (
+					<div key={item.area} className={`rounded-lg border p-2.5 ${item.color}`}>
+						<p className="text-xs font-bold">{item.area}</p>
+						<p className="text-xs mt-0.5 opacity-80">{item.desc}</p>
+					</div>
+				))}
+			</div>
+		),
+	},
+	{
+		emoji: "📁",
+		title: "Passo 1: Importe sua mídia",
+		description: "Clique na aba \"Mídia\" (ícone de pasta) no painel esquerdo, depois clique em Importar ou arraste seus arquivos.",
+		content: (
+			<div className="mt-3 rounded-lg bg-muted/50 p-3 space-y-2">
+				<p className="text-xs font-medium">Formatos suportados:</p>
+				<div className="flex flex-wrap gap-1.5">
+					{["MP4", "MOV", "AVI", "MKV", "PNG", "JPG", "MP3", "WAV"].map(f => (
+						<span key={f} className="text-[10px] bg-background border rounded px-1.5 py-0.5 font-mono">{f}</span>
+					))}
+				</div>
+				<p className="text-xs text-muted-foreground mt-2">
+					💡 Após importar, <strong>arraste o arquivo</strong> para a timeline na parte inferior da tela.
+				</p>
+			</div>
+		),
+	},
+	{
+		emoji: "✂️",
+		title: "Passo 2: Edite na timeline",
+		description: "A timeline é onde você organiza e corta os clips. Use as ferramentas no topo da timeline:",
+		content: (
+			<div className="mt-3 space-y-2">
+				{[
+					{ key: "S", desc: "Cortar o clip na posição atual do cursor" },
+					{ key: "Q", desc: "Remover a parte esquerda do corte" },
+					{ key: "W", desc: "Remover a parte direita do corte" },
+					{ key: "Del", desc: "Deletar o elemento selecionado" },
+					{ key: "Espaço", desc: "Play / Pause" },
+					{ key: "Ctrl+Z", desc: "Desfazer a última ação" },
+				].map(item => (
+					<div key={item.key} className="flex items-center gap-2.5">
+						<kbd className="bg-muted border rounded px-2 py-0.5 text-[10px] font-mono shrink-0 min-w-[40px] text-center">{item.key}</kbd>
+						<span className="text-xs text-muted-foreground">{item.desc}</span>
+					</div>
+				))}
+			</div>
+		),
+	},
+	{
+		emoji: "🚀",
+		title: "Passo 3: Exporte seu vídeo",
+		description: "Quando terminar, clique no botão azul Export no canto superior direito.",
+		content: (
+			<div className="mt-3 space-y-3">
+				<div className="rounded-lg bg-muted/50 p-3 space-y-1.5">
+					<p className="text-xs font-medium">Opções de exportação:</p>
+					{[
+						{ label: "Formato", value: "MP4 (H.264) ou WebM" },
+						{ label: "Qualidade", value: "Alta, Média ou Baixa" },
+						{ label: "Resolução", value: "Definida nas configurações do projeto" },
+					].map(item => (
+						<div key={item.label} className="flex justify-between text-xs">
+							<span className="text-muted-foreground">{item.label}</span>
+							<span className="font-medium">{item.value}</span>
+						</div>
+					))}
+				</div>
+				<p className="text-xs text-muted-foreground">
+					🎉 Pronto! Você já sabe o essencial para editar vídeos aqui.
+				</p>
+			</div>
+		),
+	},
+];
 
 export function Onboarding() {
 	const [step, setStep] = useState(0);
@@ -16,120 +102,76 @@ export function Onboarding() {
 	});
 
 	const isOpen = !hasSeenOnboarding;
+	const isLast = step === STEPS.length - 1;
+	const currentStep = STEPS[step];
 
 	const handleNext = () => {
-		setStep(step + 1);
+		if (isLast) {
+			setHasSeenOnboarding({ value: true });
+		} else {
+			setStep(step + 1);
+		}
 	};
 
-	const handleClose = () => {
+	const handleSkip = () => {
 		setHasSeenOnboarding({ value: true });
 	};
 
-	const getStepTitle = () => {
-		switch (step) {
-			case 0:
-				return "Welcome to OpenCut Beta! 🎉";
-			case 1:
-				return "⚠️ This is a super early beta!";
-			case 2:
-				return "🦋 Have fun testing!";
-			default:
-				return "OpenCut Onboarding";
-		}
-	};
-
-	const renderStepContent = () => {
-		switch (step) {
-			case 0:
-				return (
-					<div className="space-y-5">
-						<div className="space-y-3">
-							<Title title="Welcome to OpenCut Beta! 🎉" />
-							<Description description="You're among the first to try OpenCut - the fully open source CapCut alternative." />
-						</div>
-						<NextButton onClick={handleNext}>Next</NextButton>
-					</div>
-				);
-			case 1:
-				return (
-					<div className="space-y-5">
-						<div className="space-y-3">
-							<Title title={getStepTitle()} />
-							<Description description="There's still a ton of things to do to make this editor amazing." />
-							<Description description="A lot of features are still missing. We're working hard to build them out!" />
-							<Description description="If you're curious, check out our roadmap [here](https://opencut.app/roadmap)" />
-						</div>
-						<NextButton onClick={handleNext}>Next</NextButton>
-					</div>
-				);
-			case 2:
-				return (
-					<div className="space-y-5">
-						<div className="space-y-3">
-							<Title title={getStepTitle()} />
-							<Description
-								description={`Join our [Discord](${SOCIAL_LINKS.discord}), chat with cool people and share feedback to help make OpenCut the best editor ever.`}
-							/>
-						</div>
-						<NextButton onClick={handleClose}>Finish</NextButton>
-					</div>
-				);
-			default:
-				return null;
-		}
-	};
-
 	return (
-		<Dialog open={isOpen} onOpenChange={handleClose}>
-			<DialogContent className="sm:max-w-[425px]">
+		<Dialog open={isOpen} onOpenChange={handleSkip}>
+			<DialogContent className="sm:max-w-[460px]">
 				<DialogTitle>
-					<span className="sr-only">{getStepTitle()}</span>
+					<span className="sr-only">{currentStep.title}</span>
 				</DialogTitle>
-				<DialogBody>{renderStepContent()}</DialogBody>
+				<DialogDescription className="sr-only">
+					{currentStep.description}
+				</DialogDescription>
+				<DialogBody>
+					<div className="space-y-4">
+						{/* Step indicators */}
+						<div className="flex items-center gap-1.5">
+							{STEPS.map((stepItem, i) => (
+								<div
+									key={stepItem.title}
+									className={`h-1 rounded-full transition-all duration-300 ${
+										i === step ? "bg-primary flex-1" : i < step ? "bg-primary/40 w-4" : "bg-muted w-4"
+									}`}
+								/>
+							))}
+						</div>
+
+						{/* Content */}
+						<div>
+							<div className="flex items-start gap-3">
+								<span className="text-2xl">{currentStep.emoji}</span>
+								<div>
+									<h2 className="text-base font-bold">{currentStep.title}</h2>
+									<p className="text-sm text-muted-foreground mt-1">{currentStep.description}</p>
+								</div>
+							</div>
+							{currentStep.content}
+						</div>
+
+						{/* Actions */}
+						<div className="flex items-center justify-between pt-1">
+							<button
+								type="button"
+								onClick={handleSkip}
+								className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+							>
+								Pular tutorial
+							</button>
+							<Button onClick={handleNext} size="sm" className="gap-2">
+								{isLast ? (
+									<><CheckIcon className="size-3.5" />Começar a editar</>
+								) : (
+									<>Próximo<ArrowRightIcon className="size-3.5" /></>
+								)}
+							</Button>
+						</div>
+					</div>
+				</DialogBody>
 			</DialogContent>
 		</Dialog>
-	);
-}
-
-function Title({ title }: { title: string }) {
-	return <h2 className="text-lg font-bold md:text-xl">{title}</h2>;
-}
-
-function Description({ description }: { description: string }) {
-	return (
-		<div className="text-muted-foreground">
-			<ReactMarkdown
-				components={{
-					p: ({ children }) => <p className="mb-0">{children}</p>,
-					a: ({ href, children }) => (
-						<a
-							href={href}
-							target="_blank"
-							rel="noopener noreferrer"
-							className="text-foreground hover:text-foreground/80 underline"
-						>
-							{children}
-						</a>
-					),
-				}}
-			>
-				{description}
-			</ReactMarkdown>
-		</div>
-	);
-}
-
-function NextButton({
-	children,
-	onClick,
-}: {
-	children: React.ReactNode;
-	onClick: () => void;
-}) {
-	return (
-		<Button onClick={onClick} variant="default" className="w-full">
-			{children}
-			<ArrowRightIcon className="size-4" />
-		</Button>
 	);
 }

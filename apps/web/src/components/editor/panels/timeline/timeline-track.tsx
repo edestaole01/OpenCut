@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { useElementSelection } from "@/hooks/timeline/element/use-element-selection";
 import { TimelineElement } from "./timeline-element";
 import type { TimelineTrack } from "@/types/timeline";
@@ -35,7 +36,7 @@ interface TimelineTrackContentProps {
 	targetElementId?: string | null;
 }
 
-export function TimelineTrackContent({
+export const TimelineTrackContent = memo(function TimelineTrackContent({
 	track,
 	zoomLevel,
 	dragState,
@@ -65,17 +66,24 @@ export function TimelineTrackContent({
 	});
 
 	return (
-		<button
-			className="size-full"
+		<div
+			className="size-full cursor-default"
+			role="button"
+			tabIndex={0}
 			onClick={(event) => {
 				if (shouldIgnoreClick?.()) return;
 				onTrackClick?.(event);
 			}}
+			onKeyDown={(event) => {
+				if (event.key === "Enter" || event.key === " ") {
+					event.preventDefault();
+					if (shouldIgnoreClick?.()) return;
+					onTrackClick?.(event as unknown as React.MouseEvent);
+				}
+			}}
 			onMouseDown={(event) => {
-				event.preventDefault();
 				onTrackMouseDown?.(event);
 			}}
-			type="button"
 		>
 			<div className="relative h-full min-w-full">
 				{track.elements.length === 0 ? (
@@ -109,6 +117,7 @@ export function TimelineTrackContent({
 					})
 				)}
 			</div>
-		</button>
+		</div>
 	);
-}
+});
+TimelineTrackContent.displayName = "TimelineTrackContent";

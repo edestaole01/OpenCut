@@ -109,6 +109,10 @@ export const ACTIONS = {
 		description: "Toggle ripple editing",
 		category: "editing",
 	},
+	"remove-silences": {
+		description: "Remove silences from selected clips",
+		category: "editing",
+	},
 	"select-all": {
 		description: "Select all elements",
 		category: "selection",

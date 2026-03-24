@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEditor } from "@/hooks/use-editor";
+import type { EditorCore } from "@/core";
 import { useProjectsStore } from "./store";
 import type {
 	TProjectMetadata,
@@ -359,7 +360,7 @@ async function deleteProjects({
 	editor,
 	ids,
 }: {
-	editor: ReturnType<typeof useEditor>;
+	editor: EditorCore;
 	ids: string[];
 }) {
 	await editor.project.deleteProjects({ ids });
@@ -369,7 +370,7 @@ async function duplicateProjects({
 	editor,
 	ids,
 }: {
-	editor: ReturnType<typeof useEditor>;
+	editor: EditorCore;
 	ids: string[];
 }) {
 	await editor.project.duplicateProjects({ ids });
@@ -380,7 +381,7 @@ async function renameProject({
 	id,
 	name,
 }: {
-	editor: ReturnType<typeof useEditor>;
+	editor: EditorCore;
 	id: string;
 	name: string;
 }) {

@@ -18,7 +18,9 @@ import {
 	getDefaultInsertIndexForTrack,
 	validateElementTrackCompatibility,
 	enforceMainTrackStart,
+	isMainTrack,
 } from "@/lib/timeline/track-utils";
+import { rippleShiftElements, closeGapsOnTrack } from "@/lib/timeline/ripple-utils";
 import type { MediaAsset } from "@/types/assets";
 import { TIMELINE_CONSTANTS } from "@/constants/timeline-constants";
 
@@ -36,15 +38,21 @@ export class InsertElementCommand extends Command {
 	private savedState: TimelineTrack[] | null = null;
 	private targetTrackId: string | null = null;
 
-	constructor({ element, placement }: InsertElementParams) {
+	constructor({
+		element,
+		placement,
+		rippleEnabled = false,
+	}: InsertElementParams & { rippleEnabled?: boolean }) {
 		super();
 		this.elementId = generateUUID();
 		this.element = element;
 		this.placement = placement;
+		this.rippleEnabled = rippleEnabled;
 	}
 
 	private element: CreateTimelineElement;
 	private placement: InsertElementPlacement;
+	private rippleEnabled: boolean;
 
 	execute(): void {
 		const editor = EditorCore.getInstance();
@@ -216,14 +224,31 @@ export class InsertElementCommand extends Command {
 				element,
 			});
 
-			const updatedTracks = tracks.map((track) =>
-				track.id === targetTrack.id
-					? {
-							...track,
-							elements: [...track.elements, adjustedElement],
-						}
-					: track,
-			) as TimelineTrack[];
+			const updatedTracks = tracks.map((track) => {
+				if (track.id !== targetTrack.id) return track;
+
+				let newElements = track.elements;
+				if (this.rippleEnabled) {
+					newElements = rippleShiftElements({
+						elements: newElements,
+						afterTime: adjustedElement.startTime,
+						shiftAmount: -adjustedElement.duration,
+					}) as typeof track.elements;
+
+					if (isMainTrack(track)) {
+						newElements = closeGapsOnTrack({ 
+							elements: [...newElements, adjustedElement] 
+						}) as typeof track.elements;
+						// No need to add adjustedElement later if we already did in closeGaps
+						return { ...track, elements: newElements };
+					}
+				}
+
+				return {
+					...track,
+					elements: [...newElements, adjustedElement],
+				};
+			}) as TimelineTrack[];
 
 			return { updatedTracks, targetTrackId: targetTrack.id };
 		}

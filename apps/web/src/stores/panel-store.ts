@@ -41,7 +41,7 @@ export const usePanelStore = create<PanelState>()(
 		}),
 		{
 			name: "panel-sizes",
-			version: 2,
+			version: 3,
 			migrate: (persistedState) => {
 				const state = persistedState as
 					| {

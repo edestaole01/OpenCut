@@ -1,7 +1,7 @@
 import type { CanvasRenderer } from "../canvas-renderer";
 import { createOffscreenCanvas } from "../canvas-utils";
 import { BaseNode } from "./base-node";
-import type { Effect } from "@/types/effects";
+import type { Effect, EffectParamValues } from "@/types/effects";
 import type { BlendMode } from "@/types/rendering";
 import type { Transform } from "@/types/timeline";
 import type { ElementAnimations } from "@/types/animation";
@@ -13,6 +13,7 @@ import {
 import { resolveEffectParamsAtTime } from "@/lib/animation/effect-param-channel";
 import { TIME_EPSILON_SECONDS } from "@/constants/animation-constants";
 import { getEffect } from "@/lib/effects";
+import { getTransition } from "@/lib/transitions/definitions";
 import { webglEffectRenderer } from "../webgl-effect-renderer";
 
 export interface VisualNodeParams {
@@ -25,6 +26,10 @@ export interface VisualNodeParams {
 	opacity: number;
 	blendMode?: BlendMode;
 	effects?: Effect[];
+	fadeIn?: number;
+	fadeOut?: number;
+	transitionIn?: { type: string; duration: number; params?: EffectParamValues };
+	transitionOut?: { type: string; duration: number; params?: EffectParamValues };
 }
 
 export abstract class VisualNode<
@@ -75,6 +80,9 @@ export abstract class VisualNode<
 			baseOpacity: this.params.opacity,
 			animations: this.params.animations,
 			localTime: animationLocalTime,
+			elementDuration: this.params.duration,
+			fadeIn: this.params.fadeIn,
+			fadeOut: this.params.fadeOut,
 		});
 		const containScale = Math.min(
 			renderer.width / sourceWidth,
@@ -103,7 +111,21 @@ export abstract class VisualNode<
 		const enabledEffects =
 			this.params.effects?.filter((effect) => effect.enabled) ?? [];
 
-		if (enabledEffects.length === 0) {
+		// Transition Logic
+		let activeTransition: { type: string; progress: number } | null = null;
+		if (this.params.transitionIn && animationLocalTime < this.params.transitionIn.duration) {
+			activeTransition = {
+				type: this.params.transitionIn.type,
+				progress: animationLocalTime / this.params.transitionIn.duration,
+			};
+		} else if (this.params.transitionOut && animationLocalTime > this.params.duration - this.params.transitionOut.duration) {
+			activeTransition = {
+				type: this.params.transitionOut.type,
+				progress: (this.params.duration - animationLocalTime) / this.params.transitionOut.duration,
+			};
+		}
+
+		if (enabledEffects.length === 0 && !activeTransition) {
 			renderer.context.drawImage(source, x, y, scaledWidth, scaledHeight);
 			renderer.context.restore();
 			return;
@@ -126,6 +148,27 @@ export abstract class VisualNode<
 		elementCtx.drawImage(source, 0, 0, scaledWidth, scaledHeight);
 
 		let currentResult: CanvasImageSource = elementCanvas;
+
+		// Apply Transition first (as it often involves alpha/scale)
+		if (activeTransition) {
+			const definition = getTransition(activeTransition.type);
+			if (definition) {
+				const passes = definition.renderer.passes.map((pass) => ({
+					fragmentShader: pass.fragmentShader,
+					uniforms: pass.uniforms({
+						effectParams: { progress: activeTransition?.progress },
+						width: scaledWidth,
+						height: scaledHeight,
+					}),
+				}));
+				currentResult = webglEffectRenderer.applyEffect({
+					source: currentResult,
+					width: Math.round(scaledWidth),
+					height: Math.round(scaledHeight),
+					passes,
+				});
+			}
+		}
 
 		for (const effect of enabledEffects) {
 			const resolvedParams = resolveEffectParamsAtTime({

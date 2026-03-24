@@ -1,5 +1,6 @@
 "use client";
 
+import { useTimelineStore } from "@/stores/timeline-store";
 import Image from "next/image";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -228,6 +229,7 @@ function MediaAssetDraggable({
 	isRounded?: boolean;
 }) {
 	const editor = useEditor();
+	const rippleEditingEnabled = useTimelineStore((s) => s.rippleEditingEnabled);
 
 	const addElementAtTime = ({
 		asset,
@@ -248,6 +250,7 @@ function MediaAssetDraggable({
 		editor.timeline.insertElement({
 			element,
 			placement: { mode: "auto" },
+			rippleEnabled: rippleEditingEnabled,
 		});
 	};
 

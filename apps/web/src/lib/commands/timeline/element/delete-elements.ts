@@ -1,7 +1,7 @@
 import { Command } from "@/lib/commands/base-command";
 import type { TimelineTrack } from "@/types/timeline";
 import { EditorCore } from "@/core";
-import { isMainTrack, rippleShiftElements } from "@/lib/timeline";
+import { isMainTrack, rippleShiftElements, closeGapsOnTrack } from "@/lib/timeline";
 
 export class DeleteElementsCommand extends Command {
 	private savedState: TimelineTrack[] | null = null;
@@ -51,15 +51,21 @@ export class DeleteElementsCommand extends Command {
 				);
 
 				if (this.rippleEnabled && deletedElementInfos.length > 0) {
-					const sortedByStartDesc = [...deletedElementInfos].sort(
-						(a, b) => b.startTime - a.startTime,
-					);
-					for (const { startTime, duration } of sortedByStartDesc) {
-						elements = rippleShiftElements({
-							elements,
-							afterTime: startTime,
-							shiftAmount: duration,
-						});
+					if (isMainTrack(track)) {
+						// For main track in magnetic mode, ensure all gaps are closed
+						elements = closeGapsOnTrack({ elements });
+					} else {
+						// For other tracks, just shift subsequent elements
+						const sortedByStartDesc = [...deletedElementInfos].sort(
+							(a, b) => b.startTime - a.startTime,
+						);
+						for (const { startTime, duration } of sortedByStartDesc) {
+							elements = rippleShiftElements({
+								elements,
+								afterTime: startTime,
+								shiftAmount: duration,
+							});
+						}
 					}
 				}
 

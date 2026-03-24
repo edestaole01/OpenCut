@@ -1,138 +1,91 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import type React from "react";
+import { createContext, useContext, useMemo, useEffect, useState } from "react";
+import { EditorCore } from "@/core";
+import { Button } from "../ui/button";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
-import { useEditor } from "@/hooks/use-editor";
-import {
-	useKeybindingsListener,
-	useKeybindingDisabler,
-} from "@/hooks/use-keybindings";
-import { useEditorActions } from "@/hooks/actions/use-editor-actions";
-import { prefetchFontAtlas } from "@/lib/fonts/google-fonts";
+import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 
-interface EditorProviderProps {
-	projectId: string;
+export const EditorContext = createContext<EditorCore | null>(null);
+
+export function EditorProvider({
+	children,
+	projectId,
+}: {
 	children: React.ReactNode;
-}
-
-export function EditorProvider({ projectId, children }: EditorProviderProps) {
-	const editor = useEditor();
-	const router = useRouter();
-	const [isLoading, setIsLoading] = useState(true);
+	projectId?: string;
+}) {
+	const editor = useMemo(() => EditorCore.getInstance(), []);
+	const [isReady, setIsReady] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const { disableKeybindings, enableKeybindings } = useKeybindingDisabler();
-	const activeProject = editor.project.getActiveOrNull();
+	const router = useRouter();
 
 	useEffect(() => {
-		if (isLoading) {
-			disableKeybindings();
-		} else {
-			enableKeybindings();
-		}
-	}, [isLoading, disableKeybindings, enableKeybindings]);
+		let isMounted = true;
 
-	useEffect(() => {
-		let cancelled = false;
-
-		const loadProject = async () => {
-			try {
-				setIsLoading(true);
-				await editor.project.loadProject({ id: projectId });
-
-				if (cancelled) return;
-
-				setIsLoading(false);
-				prefetchFontAtlas();
-			} catch (err) {
-				if (cancelled) return;
-
-				const isNotFound =
-					err instanceof Error &&
-					(err.message.includes("not found") ||
-						err.message.includes("does not exist"));
-
-				if (isNotFound) {
-					try {
-						const newProjectId = await editor.project.createNewProject({
-							name: "Untitled Project",
-						});
-						router.replace(`/editor/${newProjectId}`);
-					} catch (_createErr) {
-						setError("Failed to create project");
-						setIsLoading(false);
+		async function init() {
+			if (projectId) {
+				try {
+					await editor.project.loadProject({ id: projectId });
+				} catch (err) {
+					console.error("Failed to load project in provider:", err);
+					if (isMounted) {
+						setError(err instanceof Error ? err.message : "Não foi possível carregar o projeto");
 					}
-				} else {
-					setError(
-						err instanceof Error ? err.message : "Failed to load project",
-					);
-					setIsLoading(false);
 				}
 			}
-		};
+			
+			if (isMounted) {
+				setIsReady(true);
+			}
+		}
 
-		loadProject();
+		init();
 
 		return () => {
-			cancelled = true;
+			isMounted = false;
 		};
-	}, [projectId, editor, router]);
+	}, [editor, projectId]);
 
 	if (error) {
 		return (
-			<div className="bg-background flex h-screen w-screen items-center justify-center">
-				<div className="flex flex-col items-center gap-4">
-					<p className="text-destructive text-sm">{error}</p>
+			<div className="flex h-screen w-screen flex-col items-center justify-center bg-background gap-4 px-10 text-center">
+				<div className="flex flex-col gap-2">
+					<h2 className="text-xl font-bold text-foreground">Ops! Algo deu errado.</h2>
+					<p className="text-sm text-muted-foreground">{error}</p>
 				</div>
+				<Button onClick={() => router.push("/dashboard")} className="gap-2">
+					<HugeiconsIcon icon={ArrowLeft01Icon} className="size-4" />
+					Voltar ao Dashboard
+				</Button>
 			</div>
 		);
 	}
 
-	if (isLoading) {
+	if (!isReady) {
 		return (
-			<div className="bg-background flex h-screen w-screen items-center justify-center">
-				<div className="flex flex-col items-center gap-4">
-					<Loader2 className="text-muted-foreground size-8 animate-spin" />
-					<p className="text-muted-foreground text-sm">Loading project...</p>
-				</div>
-			</div>
-		);
-	}
-
-	if (!activeProject) {
-		return (
-			<div className="bg-background flex h-screen w-screen items-center justify-center">
-				<div className="flex flex-col items-center gap-4">
-					<Loader2 className="text-muted-foreground size-8 animate-spin" />
-					<p className="text-muted-foreground text-sm">Exiting project...</p>
+			<div className="flex h-screen w-screen items-center justify-center bg-background">
+				<div className="flex flex-col items-center gap-3">
+					<div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+					<p className="text-sm text-muted-foreground animate-pulse">Carregando editor...</p>
 				</div>
 			</div>
 		);
 	}
 
 	return (
-		<>
-			<EditorRuntimeBindings />
+		<EditorContext.Provider value={editor}>
 			{children}
-		</>
+		</EditorContext.Provider>
 	);
 }
 
-function EditorRuntimeBindings() {
-	const editor = useEditor();
-
-	useEffect(() => {
-		const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-			if (!editor.save.getIsDirty()) return;
-			event.preventDefault();
-			(event as unknown as { returnValue: string }).returnValue = "";
-		};
-
-		window.addEventListener("beforeunload", handleBeforeUnload);
-		return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-	}, [editor]);
-
-	useEditorActions();
-	useKeybindingsListener();
-	return null;
+export function useEditorInstance(): EditorCore {
+	const context = useContext(EditorContext);
+	if (!context) {
+		throw new Error("useEditorInstance must be used within an EditorProvider");
+	}
+	return context;
 }

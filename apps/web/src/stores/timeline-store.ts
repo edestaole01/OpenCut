@@ -1,7 +1,4 @@
-/**
- * UI state for the timeline
- * For core logic, use EditorCore instead.
- */
+"use client";
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
@@ -12,35 +9,42 @@ interface TimelineStore {
 	toggleSnapping: () => void;
 	rippleEditingEnabled: boolean;
 	toggleRippleEditing: () => void;
+	isBladeModeEnabled: boolean;
+	toggleBladeMode: () => void;
+	autoKeyframingEnabled: boolean;
+	toggleAutoKeyframing: () => void;
 	clipboard: {
 		items: ClipboardItem[];
 	} | null;
-	setClipboard: (
-		clipboard: {
-			items: ClipboardItem[];
-		} | null,
-	) => void;
+	setClipboard: (clipboard: { items: ClipboardItem[] } | null) => void;
 }
 
 export const useTimelineStore = create<TimelineStore>()(
 	persist(
 		(set) => ({
 			snappingEnabled: true,
-
 			toggleSnapping: () => {
 				set((state) => ({ snappingEnabled: !state.snappingEnabled }));
 			},
 
 			rippleEditingEnabled: false,
-
 			toggleRippleEditing: () => {
 				set((state) => ({
 					rippleEditingEnabled: !state.rippleEditingEnabled,
 				}));
 			},
 
-			clipboard: null,
+			isBladeModeEnabled: false,
+			toggleBladeMode: () => {
+				set((state) => ({ isBladeModeEnabled: !state.isBladeModeEnabled }));
+			},
 
+			autoKeyframingEnabled: false,
+			toggleAutoKeyframing: () => {
+				set((state) => ({ autoKeyframingEnabled: !state.autoKeyframingEnabled }));
+			},
+
+			clipboard: null,
 			setClipboard: (clipboard) => {
 				set({ clipboard });
 			},

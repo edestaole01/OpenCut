@@ -77,12 +77,18 @@ export function resolveOpacityAtTime({
 	baseOpacity,
 	animations,
 	localTime,
+	elementDuration,
+	fadeIn = 0,
+	fadeOut = 0,
 }: {
 	baseOpacity: number;
 	animations: ElementAnimations | undefined;
 	localTime: number;
+	elementDuration: number;
+	fadeIn?: number;
+	fadeOut?: number;
 }): number {
-	return getNumberChannelValueAtTime({
+	const animatedOpacity = getNumberChannelValueAtTime({
 		channel: getNumberChannelForPath({
 			animations,
 			propertyPath: "opacity",
@@ -90,6 +96,15 @@ export function resolveOpacityAtTime({
 		time: Math.max(0, localTime),
 		fallbackValue: baseOpacity,
 	});
+
+	let fadeMultiplier = 1;
+	if (localTime < fadeIn) {
+		fadeMultiplier = localTime / fadeIn;
+	} else if (localTime > elementDuration - fadeOut) {
+		fadeMultiplier = (elementDuration - localTime) / fadeOut;
+	}
+
+	return animatedOpacity * Math.max(0, Math.min(1, fadeMultiplier));
 }
 
 export function resolveNumberAtTime({
@@ -132,12 +147,18 @@ export function resolveVolumeAtTime({
 	baseVolume,
 	animations,
 	localTime,
+	elementDuration,
+	fadeIn = 0,
+	fadeOut = 0,
 }: {
 	baseVolume: number;
 	animations: ElementAnimations | undefined;
 	localTime: number;
+	elementDuration: number;
+	fadeIn?: number;
+	fadeOut?: number;
 }): number {
-	return getNumberChannelValueAtTime({
+	const animatedVolume = getNumberChannelValueAtTime({
 		channel: getNumberChannelForPath({
 			animations,
 			propertyPath: "volume",
@@ -145,4 +166,13 @@ export function resolveVolumeAtTime({
 		time: Math.max(0, localTime),
 		fallbackValue: baseVolume,
 	});
+
+	let fadeMultiplier = 1;
+	if (localTime < fadeIn) {
+		fadeMultiplier = localTime / fadeIn;
+	} else if (localTime > elementDuration - fadeOut) {
+		fadeMultiplier = (elementDuration - localTime) / fadeOut;
+	}
+
+	return animatedVolume * Math.max(0, Math.min(1, fadeMultiplier));
 }

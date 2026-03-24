@@ -5,9 +5,9 @@ import { signOut, useSession } from "@/lib/auth/client";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard, Video, Scissors, Share2,
+  LayoutDashboard, Video, Share2,
   BarChart2, Settings, Users, LogOut, Zap,
-  Building2, UserCircle
+  Building2, UserCircle, Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -15,10 +15,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 const menuItems = [
   { icon: LayoutDashboard, label: "Início", href: "/dashboard" },
   { icon: Zap, label: "AI Studio", href: "/dashboard/ai-studio" },
+  { icon: Sparkles, label: "Captions IA", href: "/dashboard/captions" },
   { icon: Video, label: "Projetos", href: "/dashboard/projetos" },
-  { icon: Scissors, label: "Editor", href: "/projects" },
-  { icon: Share2, label: "Redes Sociais", href: "/dashboard/redes-sociais" },
-  { icon: BarChart2, label: "Analytics", href: "/dashboard/analytics" },
+  { icon: Share2, label: "Redes Sociais", href: "/dashboard/redes-sociais", badge: "Beta" },
+  { icon: BarChart2, label: "Analytics", href: "/dashboard/analytics", badge: "Breve" },
 ];
 
 const configItems = [
@@ -57,13 +57,23 @@ export function Sidebar() {
         {menuItems.map((item) => (
           <Link key={item.href} href={item.href}>
             <div className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer",
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer group",
               pathname === item.href
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             )}>
               <item.icon className="w-4 h-4" />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {item.badge && (
+                <span className={cn(
+                  "text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider",
+                  pathname === item.href 
+                    ? "bg-primary-foreground/20 text-primary-foreground" 
+                    : "bg-muted text-muted-foreground group-hover:bg-accent-foreground/10"
+                )}>
+                  {item.badge}
+                </span>
+              )}
             </div>
           </Link>
         ))}

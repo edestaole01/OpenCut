@@ -252,6 +252,9 @@ export interface AudioClipSource {
 	trimStart: number;
 	trimEnd: number;
 	muted: boolean;
+	volume?: number;
+	fadeIn?: number;
+	fadeOut?: number;
 }
 
 async function fetchLibraryAudioSource({
@@ -310,6 +313,9 @@ async function fetchLibraryAudioClip({
 			trimStart: element.trimStart,
 			trimEnd: element.trimEnd,
 			muted,
+			volume: element.volume,
+			fadeIn: element.fadeIn,
+			fadeOut: element.fadeOut,
 		};
 	} catch (error) {
 		console.warn("Failed to fetch library audio:", error);
@@ -351,6 +357,9 @@ function collectMediaAudioClip({
 		trimStart: element.trimStart,
 		trimEnd: element.trimEnd,
 		muted,
+		volume: "volume" in element ? element.volume : 1,
+		fadeIn: element.fadeIn,
+		fadeOut: element.fadeOut,
 	};
 }
 

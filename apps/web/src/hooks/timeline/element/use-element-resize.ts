@@ -322,6 +322,13 @@ export function useTimelineElementResize({
 					currentDurationRef.current = newDuration;
 				}
 			}
+
+			// Visual Trim Preview: Seek to the edge being dragged
+			const previewTime = resizing.side === "left" 
+				? currentStartTimeRef.current 
+				: currentStartTimeRef.current + currentDurationRef.current;
+			
+			editor.playback.seek({ time: previewTime });
 		},
 		[
 			resizing,

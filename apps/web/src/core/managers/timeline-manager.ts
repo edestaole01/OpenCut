@@ -61,8 +61,16 @@ export class TimelineManager {
 		this.editor.command.execute({ command });
 	}
 
-	insertElement({ element, placement }: InsertElementParams): void {
-		const command = new InsertElementCommand({ element, placement });
+	insertElement({
+		element,
+		placement,
+		rippleEnabled = false,
+	}: InsertElementParams & { rippleEnabled?: boolean }): void {
+		const command = new InsertElementCommand({
+			element,
+			placement,
+			rippleEnabled,
+		});
 		this.editor.command.execute({ command });
 	}
 
@@ -243,6 +251,23 @@ export class TimelineManager {
 	}): void {
 		const command = new DeleteElementsCommand({ elements, rippleEnabled });
 		this.editor.command.execute({ command });
+	}
+
+	updateElement({
+		trackId,
+		elementId,
+		patch,
+		pushHistory = true,
+	}: {
+		trackId: string;
+		elementId: string;
+		patch: Partial<TimelineElement>;
+		pushHistory?: boolean;
+	}): void {
+		this.updateElements({
+			updates: [{ trackId, elementId, updates: patch }],
+			pushHistory,
+		});
 	}
 
 	updateElements({
@@ -603,7 +628,9 @@ export class TimelineManager {
 	}
 
 	private notify(): void {
-		this.listeners.forEach((fn) => fn());
+		this.listeners.forEach((fn) => {
+			fn();
+		});
 	}
 
 	updateTracks(newTracks: TimelineTrack[]): void {

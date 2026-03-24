@@ -116,6 +116,7 @@ export class TextNode extends BaseNode<TextNodeParams> {
 			baseOpacity: this.params.opacity,
 			animations: this.params.animations,
 			localTime,
+			elementDuration: this.params.duration,
 		});
 
 		const x = transform.position.x + this.params.canvasCenter.x;
