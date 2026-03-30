@@ -21,3 +21,10 @@ bun.lockb
 
 # Video uploads
 *.mp4
+
+# Local AI assistant artifacts
+.claude/settings.local.json
+.claude/worktrees/
+
+# Build cache
+apps/web/tsconfig.tsbuildinfo
