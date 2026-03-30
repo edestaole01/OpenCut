@@ -41,7 +41,9 @@ export const useTimelineStore = create<TimelineStore>()(
 
 			autoKeyframingEnabled: false,
 			toggleAutoKeyframing: () => {
-				set((state) => ({ autoKeyframingEnabled: !state.autoKeyframingEnabled }));
+				set((state) => ({
+					autoKeyframingEnabled: !state.autoKeyframingEnabled,
+				}));
 			},
 
 			clipboard: null,

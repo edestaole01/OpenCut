@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useEffect, useState } from "react";
 import { useElementSelection } from "@/hooks/timeline/element/use-element-selection";
 import { TimelineElement } from "./timeline-element";
 import type { TimelineTrack } from "@/types/timeline";
@@ -10,6 +10,9 @@ import { TIMELINE_CONSTANTS } from "@/constants/timeline-constants";
 import { useEdgeAutoScroll } from "@/hooks/timeline/use-edge-auto-scroll";
 import type { ElementDragState } from "@/types/timeline";
 import { useEditor } from "@/hooks/use-editor";
+
+// Render buffer beyond the visible area to prevent flickering during scroll
+const VIRTUAL_BUFFER_PX = 400;
 
 interface TimelineTrackContentProps {
 	track: TimelineTrack;
@@ -52,10 +55,24 @@ export const TimelineTrackContent = memo(function TimelineTrackContent({
 	shouldIgnoreClick,
 	targetElementId = null,
 }: TimelineTrackContentProps) {
-	const editor = useEditor();
+	const _editor = useEditor();
 	const { isElementSelected } = useElementSelection();
 
-	const duration = editor.timeline.getTotalDuration();
+	// Subscribe only to "timeline" — no re-renders from media/selection/renderer
+	const duration = useEditor(
+		(e) => e.timeline.getTotalDuration(),
+		["timeline"],
+	);
+
+	// Track scroll position to virtualize off-screen elements
+	const [scrollLeft, setScrollLeft] = useState(0);
+	useEffect(() => {
+		const el = tracksScrollRef.current;
+		if (!el) return;
+		const onScroll = () => setScrollLeft(el.scrollLeft);
+		el.addEventListener("scroll", onScroll, { passive: true });
+		return () => el.removeEventListener("scroll", onScroll);
+	}, [tracksScrollRef]);
 
 	useEdgeAutoScroll({
 		isActive: dragState.isDragging,
@@ -66,10 +83,10 @@ export const TimelineTrackContent = memo(function TimelineTrackContent({
 	});
 
 	return (
+		/* biome-ignore lint/a11y/noStaticElementInteractions: track container needs click handling */
 		<div
 			className="size-full cursor-default"
-			role="button"
-			tabIndex={0}
+			role="presentation"
 			onClick={(event) => {
 				if (shouldIgnoreClick?.()) return;
 				onTrackClick?.(event);
@@ -90,6 +107,22 @@ export const TimelineTrackContent = memo(function TimelineTrackContent({
 					<div className="text-muted-foreground border-muted/30 flex size-full items-center justify-center rounded-sm border-2 border-dashed text-xs" />
 				) : (
 					track.elements.map((element) => {
+						const pxPerSec = TIMELINE_CONSTANTS.PIXELS_PER_SECOND * zoomLevel;
+						const elementLeft = element.startTime * pxPerSec;
+						const elementWidth = element.duration * pxPerSec;
+						const viewportWidth = tracksScrollRef.current?.clientWidth ?? 0;
+						const isBeingDragged =
+							dragState.elementId === element.id && dragState.isDragging;
+						const visibleStart = scrollLeft - VIRTUAL_BUFFER_PX;
+						const visibleEnd = scrollLeft + viewportWidth + VIRTUAL_BUFFER_PX;
+						if (
+							!isBeingDragged &&
+							(elementLeft + elementWidth < visibleStart ||
+								elementLeft > visibleEnd)
+						) {
+							return null;
+						}
+
 						const isSelected = isElementSelected({
 							trackId: track.id,
 							elementId: element.id,

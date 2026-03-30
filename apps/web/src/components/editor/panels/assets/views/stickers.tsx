@@ -16,6 +16,7 @@ import {
 import {
 	resolveStickerId,
 	type StickerItem as StickerData,
+	browseStickers,
 } from "@/lib/stickers";
 import { useStickersStore } from "@/stores/stickers-store";
 import { cn } from "@/utils/ui";
@@ -125,12 +126,49 @@ function EmptyView({ message }: { message: string }) {
 function StickersContentView() {
 	const {
 		searchQuery,
+		selectedCategory,
 		viewMode,
 		searchResults,
 		recentStickers,
 		isSearching,
 		clearRecentStickers,
 	} = useStickersStore();
+	const [browseItems, setBrowseItems] = useState<StickerData[]>([]);
+	const [isBrowsing, setIsBrowsing] = useState(false);
+
+	useEffect(() => {
+		let ignore = false;
+		if (viewMode !== "browse") {
+			return;
+		}
+
+		setIsBrowsing(true);
+		void browseStickers({
+			category: selectedCategory,
+			page: 1,
+			limit: 120,
+		})
+			.then((result) => {
+				if (!ignore) {
+					setBrowseItems(result.items);
+				}
+			})
+			.catch((error) => {
+				console.error("Failed to load stickers:", error);
+				if (!ignore) {
+					setBrowseItems([]);
+				}
+			})
+			.finally(() => {
+				if (!ignore) {
+					setIsBrowsing(false);
+				}
+			});
+
+		return () => {
+			ignore = true;
+		};
+	}, [viewMode, selectedCategory]);
 
 	const itemsToDisplay = useMemo(() => {
 		if (viewMode === "search" && searchResults) {
@@ -203,6 +241,20 @@ function StickersContentView() {
 					) : searchQuery ? (
 						<EmptyView message={`No stickers found for "${searchQuery}"`} />
 					) : null}
+				</div>
+			)}
+
+			{viewMode === "browse" && (
+				<div className="h-full">
+					{isBrowsing ? (
+						<div className="flex items-center justify-center py-8">
+							<Spinner className="text-muted-foreground size-6" />
+						</div>
+					) : browseItems.length > 0 ? (
+						<StickerGrid items={browseItems} shouldCapSize />
+					) : (
+						<EmptyView message="Não foi possível carregar stickers agora." />
+					)}
 				</div>
 			)}
 		</div>

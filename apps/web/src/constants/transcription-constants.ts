@@ -5,7 +5,7 @@ import type {
 } from "@/types/transcription";
 import type { LanguageCode } from "@/types/language";
 
-const SUPPORTED_TRANSCRIPTION_LANGS: ReadonlyArray<LanguageCode> = [
+export const SUPPORTED_TRANSCRIPTION_LANGS: ReadonlyArray<LanguageCode> = [
 	"en",
 	"es",
 	"it",
@@ -25,20 +25,32 @@ export const TRANSCRIPTION_MODELS: TranscriptionModel[] = [
 	{
 		id: "whisper-tiny",
 		name: "Tiny",
-		huggingFaceId: "onnx-community/whisper-tiny",
+		huggingFaceId: "Xenova/whisper-tiny",
 		description: "Fastest, lower accuracy",
+	},
+	{
+		id: "whisper-base",
+		name: "Base",
+		huggingFaceId: "Xenova/whisper-base",
+		description: "Recommended: Good speed and accuracy",
 	},
 	{
 		id: "whisper-small",
 		name: "Small",
-		huggingFaceId: "onnx-community/whisper-small",
-		description: "Good balance of speed and accuracy",
+		huggingFaceId: "Xenova/whisper-small",
+		description: "Better accuracy, slower",
 	},
 	{
 		id: "whisper-medium",
 		name: "Medium",
-		huggingFaceId: "onnx-community/whisper-medium",
+		huggingFaceId: "Xenova/whisper-medium",
 		description: "Higher accuracy, slower",
+	},
+	{
+		id: "whisper-large-v3",
+		name: "Large v3",
+		huggingFaceId: "Xenova/whisper-large-v3",
+		description: "Highest quality, heavier model",
 	},
 	{
 		id: "whisper-large-v3-turbo",
@@ -48,8 +60,7 @@ export const TRANSCRIPTION_MODELS: TranscriptionModel[] = [
 	},
 ];
 
-export const DEFAULT_TRANSCRIPTION_MODEL: TranscriptionModelId =
-	"whisper-small";
+export const DEFAULT_TRANSCRIPTION_MODEL: TranscriptionModelId = "whisper-base";
 
 export const DEFAULT_CHUNK_LENGTH_SECONDS = 30;
 export const DEFAULT_STRIDE_SECONDS = 5;

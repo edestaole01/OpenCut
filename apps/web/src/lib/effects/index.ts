@@ -3,7 +3,12 @@ import { getEffect } from "./registry";
 import type { Effect, EffectParamValues } from "@/types/effects";
 import type { VisualElement } from "@/types/timeline";
 
-export { getEffect, getAllEffects, hasEffect, registerEffect } from "./registry";
+export {
+	getEffect,
+	getAllEffects,
+	hasEffect,
+	registerEffect,
+} from "./registry";
 export { registerDefaultEffects } from "./definitions";
 
 export const EFFECT_TARGET_ELEMENT_TYPES: VisualElement["type"][] = [

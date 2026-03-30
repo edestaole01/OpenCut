@@ -1,7 +1,11 @@
 import { Command } from "@/lib/commands/base-command";
 import type { TimelineTrack } from "@/types/timeline";
 import { EditorCore } from "@/core";
-import { isMainTrack, rippleShiftElements, closeGapsOnTrack } from "@/lib/timeline";
+import {
+	isMainTrack,
+	rippleShiftElements,
+	closeGapsOnTrack,
+} from "@/lib/timeline";
 
 export class DeleteElementsCommand extends Command {
 	private savedState: TimelineTrack[] | null = null;
@@ -39,8 +43,14 @@ export class DeleteElementsCommand extends Command {
 					.map((target) =>
 						track.elements.find((element) => element.id === target.elementId),
 					)
-					.filter((element): element is NonNullable<typeof element> => element !== undefined)
-					.map((element) => ({ startTime: element.startTime, duration: element.duration }));
+					.filter(
+						(element): element is NonNullable<typeof element> =>
+							element !== undefined,
+					)
+					.map((element) => ({
+						startTime: element.startTime,
+						duration: element.duration,
+					}));
 
 				let elements = track.elements.filter(
 					(element) =>

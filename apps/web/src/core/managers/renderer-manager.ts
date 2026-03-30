@@ -70,9 +70,9 @@ export class RendererManager {
 				timeInSeconds: renderTime,
 				fps,
 			}).replace(/:/g, "-");
-			const safeName = activeProject.metadata.name
-				.replace(/[<>:"/\\|?*]/g, "-")
-				.trim() || "snapshot";
+			const safeName =
+				activeProject.metadata.name.replace(/[<>:"/\\|?*]/g, "-").trim() ||
+				"snapshot";
 			const filename = `${safeName}-${timecode}.png`;
 
 			downloadBlob({ blob, filename });

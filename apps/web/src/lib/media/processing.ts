@@ -70,40 +70,105 @@ export async function generateThumbnail({
 	videoFile: File;
 	timeInSeconds: number;
 }): Promise<string> {
-	const input = new Input({
-		source: new BlobSource(videoFile),
-		formats: ALL_FORMATS,
-	});
-
-	const videoTrack = await input.getPrimaryVideoTrack();
-	if (!videoTrack) {
-		throw new Error("No video track found in the file");
-	}
-
-	const canDecode = await videoTrack.canDecode();
-	if (!canDecode) {
-		throw new Error("Video codec not supported for decoding");
-	}
-
-	const sink = new VideoSampleSink(videoTrack);
-
-	const frame = await sink.getSample(timeInSeconds);
-
-	if (!frame) {
-		throw new Error("Could not get frame at specified time");
-	}
-
 	try {
-		return renderToThumbnailDataUrl({
-			width: videoTrack.displayWidth,
-			height: videoTrack.displayHeight,
-			draw: ({ context, width, height }) => {
-				frame.draw(context, 0, 0, width, height);
-			},
+		const input = new Input({
+			source: new BlobSource(videoFile),
+			formats: ALL_FORMATS,
 		});
-	} finally {
-		frame.close();
+
+		const videoTrack = await input.getPrimaryVideoTrack();
+		if (!videoTrack) {
+			throw new Error("No video track found in the file");
+		}
+
+		const canDecode = await videoTrack.canDecode();
+		if (!canDecode) {
+			throw new Error("Video codec not supported for decoding");
+		}
+
+		const sink = new VideoSampleSink(videoTrack);
+		const frame = await sink.getSample(timeInSeconds);
+
+		if (!frame) {
+			throw new Error("Could not get frame at specified time");
+		}
+
+		try {
+			return renderToThumbnailDataUrl({
+				width: videoTrack.displayWidth,
+				height: videoTrack.displayHeight,
+				draw: ({ context, width, height }) => {
+					frame.draw(context, 0, 0, width, height);
+				},
+			});
+		} finally {
+			frame.close();
+		}
+	} catch {
+		return generateThumbnailFromVideoElement({ videoFile, timeInSeconds });
 	}
+}
+
+async function generateThumbnailFromVideoElement({
+	videoFile,
+	timeInSeconds,
+}: {
+	videoFile: File;
+	timeInSeconds: number;
+}): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const video = document.createElement("video");
+		const objectUrl = URL.createObjectURL(videoFile);
+		video.preload = "metadata";
+		video.muted = true;
+		video.src = objectUrl;
+
+		const cleanup = () => {
+			video.pause();
+			video.removeAttribute("src");
+			video.load();
+			URL.revokeObjectURL(objectUrl);
+		};
+
+		video.addEventListener("loadedmetadata", () => {
+			const duration = Number.isFinite(video.duration) ? video.duration : 0;
+			const targetTime =
+				duration > 0
+					? Math.min(Math.max(0, timeInSeconds), Math.max(0, duration - 0.05))
+					: 0;
+			video.currentTime = targetTime;
+		});
+
+		video.addEventListener("seeked", () => {
+			try {
+				if (!video.videoWidth || !video.videoHeight) {
+					throw new Error("Video metadata unavailable for thumbnail");
+				}
+
+				const thumbnailDataUrl = renderToThumbnailDataUrl({
+					width: video.videoWidth,
+					height: video.videoHeight,
+					draw: ({ context, width, height }) => {
+						context.drawImage(video, 0, 0, width, height);
+					},
+				});
+				cleanup();
+				resolve(thumbnailDataUrl);
+			} catch (error) {
+				cleanup();
+				reject(
+					error instanceof Error
+						? error
+						: new Error("Thumbnail fallback failed"),
+				);
+			}
+		});
+
+		video.addEventListener("error", () => {
+			cleanup();
+			reject(new Error("Could not load video for thumbnail fallback"));
+		});
+	});
 }
 
 export async function generateImageThumbnail({

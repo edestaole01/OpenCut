@@ -98,7 +98,11 @@ interface BaseTimelineElement {
 	fadeIn?: number;
 	fadeOut?: number;
 	transitionIn?: { type: string; duration: number; params?: EffectParamValues };
-	transitionOut?: { type: string; duration: number; params?: EffectParamValues };
+	transitionOut?: {
+		type: string;
+		duration: number;
+		params?: EffectParamValues;
+	};
 }
 
 export interface VideoElement extends BaseTimelineElement {
@@ -143,6 +147,7 @@ export interface TextElement extends BaseTimelineElement {
 	fontWeight: "normal" | "bold";
 	fontStyle: "normal" | "italic";
 	textDecoration: "none" | "underline" | "line-through";
+	textTransform?: "none" | "uppercase" | "lowercase" | "capitalize" | "sentence";
 	letterSpacing?: number;
 	lineHeight?: number;
 	hidden?: boolean;

@@ -5,6 +5,7 @@ import { IndexedDBAdapter } from "./indexeddb-adapter";
 import { OPFSAdapter } from "./opfs-adapter";
 import type {
 	MediaAssetData,
+	StorageAdapter,
 	StorageConfig,
 	SerializedProject,
 	SerializedScene,
@@ -85,7 +86,13 @@ class StorageService {
 			this.config.version,
 		);
 
-		const mediaAssetsAdapter = new OPFSAdapter(`media-files-${projectId}`);
+		const mediaAssetsAdapter: StorageAdapter<File> = this.isOPFSSupported()
+			? new OPFSAdapter(`media-files-${projectId}`)
+			: new IndexedDBAdapter<File>(
+					`${this.config.mediaDb}-${projectId}`,
+					"media-files",
+					this.config.version,
+				);
 
 		return { mediaMetadataAdapter, mediaAssetsAdapter };
 	}
@@ -480,7 +487,7 @@ class StorageService {
 	}
 
 	isIndexedDBSupported(): boolean {
-		return "indexedDB" in window;
+		return typeof window !== "undefined" && "indexedDB" in window;
 	}
 
 	isFullySupported(): boolean {

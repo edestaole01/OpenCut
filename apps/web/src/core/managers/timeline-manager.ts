@@ -74,6 +74,28 @@ export class TimelineManager {
 		this.editor.command.execute({ command });
 	}
 
+	insertElements({
+		elements,
+		rippleEnabled = false,
+	}: {
+		elements: Array<InsertElementParams>;
+		rippleEnabled?: boolean;
+	}): void {
+		if (elements.length === 0) return;
+
+		const commands = elements.map(
+			(params) =>
+				new InsertElementCommand({
+					...params,
+					rippleEnabled,
+				}),
+		);
+
+		const command =
+			commands.length === 1 ? commands[0] : new BatchCommand(commands);
+		this.editor.command.execute({ command });
+	}
+
 	updateElementTrim({
 		elementId,
 		trimStart,
@@ -619,7 +641,7 @@ export class TimelineManager {
 	}
 
 	getTracks(): TimelineTrack[] {
-		return this.editor.scenes.getActiveScene()?.tracks ?? [];
+		return this.editor.scenes.getScenes().find(s => s.id === this.editor.scenes.getActiveSceneOrNull()?.id)?.tracks ?? [];
 	}
 
 	subscribe(listener: () => void): () => void {

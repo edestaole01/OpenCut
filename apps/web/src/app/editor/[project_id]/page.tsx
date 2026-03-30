@@ -13,9 +13,18 @@ import { PreviewPanel } from "@/components/editor/panels/preview";
 import { EditorHeader } from "@/components/editor/editor-header";
 import { EditorProvider } from "@/components/providers/editor-provider";
 import { Onboarding } from "@/components/editor/onboarding";
-import { MigrationDialog } from "@/components/editor/dialogs/migration-dialog";
+import dynamic from "next/dynamic";
+const MigrationDialog = dynamic(
+	() =>
+		import("@/components/editor/dialogs/migration-dialog").then(
+			(m) => m.MigrationDialog,
+		),
+	{ ssr: false },
+);
 import { usePanelStore } from "@/stores/panel-store";
 import { usePasteMedia } from "@/hooks/use-paste-media";
+import { useEditorActions } from "@/hooks/actions/use-editor-actions";
+import { useKeybindingsListener } from "@/hooks/use-keybindings";
 import { MobileGate } from "@/components/editor/mobile-gate";
 
 export default function Editor() {
@@ -40,6 +49,8 @@ export default function Editor() {
 
 function EditorLayout() {
 	usePasteMedia();
+	useEditorActions();
+	useKeybindingsListener();
 	const { panels, setPanel } = usePanelStore();
 
 	return (

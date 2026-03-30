@@ -6,43 +6,60 @@ import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
 async function getUser(req: NextRequest) {
-  const session = await auth.api.getSession({ headers: req.headers });
-  if (!session?.user) return null;
-  return session.user;
+	const session = await auth.api.getSession({ headers: req.headers });
+	if (!session?.user) return null;
+	return session.user;
 }
 
 export async function GET(req: NextRequest) {
-  const user = await getUser(req);
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const list = await db.select().from(speakers).where(eq(speakers.userId, user.id));
-  return NextResponse.json(list);
+	const user = await getUser(req);
+	if (!user)
+		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+	const list = await db
+		.select()
+		.from(speakers)
+		.where(eq(speakers.userId, user.id));
+	return NextResponse.json(list);
 }
 
 export async function POST(req: NextRequest) {
-  const user = await getUser(req);
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+	const user = await getUser(req);
+	if (!user)
+		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await req.json();
-  const { speakersList } = body; // array de speakers
+	const body = await req.json();
+	const { speakersList } = body; // array de speakers
 
-  if (!Array.isArray(speakersList)) return NextResponse.json({ error: "Invalid data" }, { status: 400 });
+	if (!Array.isArray(speakersList))
+		return NextResponse.json({ error: "Invalid data" }, { status: 400 });
 
-  // Remove todos e reinserere (upsert simples)
-  await db.delete(speakers).where(eq(speakers.userId, user.id));
+	type SpeakerInput = {
+		id?: string;
+		name: string;
+		role?: string;
+		linkedin?: string;
+		instagram?: string;
+	};
 
-  if (speakersList.length > 0) {
-    await db.insert(speakers).values(
-      speakersList.map((s: any) => ({
-        id: s.id || nanoid(),
-        userId: user.id,
-        name: s.name,
-        role: s.role,
-        linkedin: s.linkedin,
-        instagram: s.instagram,
-      }))
-    );
-  }
+	// Remove todos e reinserere (upsert simples)
+	await db.delete(speakers).where(eq(speakers.userId, user.id));
 
-  const list = await db.select().from(speakers).where(eq(speakers.userId, user.id));
-  return NextResponse.json(list);
+	if (speakersList.length > 0) {
+		await db.insert(speakers).values(
+			(speakersList as SpeakerInput[]).map((s) => ({
+				id: s.id || nanoid(),
+				userId: user.id,
+				name: s.name,
+				role: s.role,
+				linkedin: s.linkedin,
+				instagram: s.instagram,
+			})),
+		);
+	}
+
+	const list = await db
+		.select()
+		.from(speakers)
+		.where(eq(speakers.userId, user.id));
+	return NextResponse.json(list);
 }

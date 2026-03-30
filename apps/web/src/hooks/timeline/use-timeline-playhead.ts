@@ -3,10 +3,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useEdgeAutoScroll } from "@/hooks/timeline/use-edge-auto-scroll";
 import { useEditor } from "../use-editor";
 import { useShiftKey } from "@/hooks/use-shift-key";
-import {
-	findSnapPoints,
-	snapToNearestPoint,
-} from "@/lib/timeline/snap-utils";
+import { findSnapPoints, snapToNearestPoint } from "@/lib/timeline/snap-utils";
 import { TIMELINE_CONSTANTS } from "@/constants/timeline-constants";
 
 interface UseTimelinePlayheadProps {
@@ -86,8 +83,7 @@ export function useTimelinePlayhead({
 			const time = (() => {
 				if (!shouldSnap) return frameTime;
 				const tracks = editor.timeline.getTracks();
-				const bookmarks =
-					editor.scenes.getActiveScene()?.bookmarks ?? [];
+				const bookmarks = editor.scenes.getActiveScene()?.bookmarks ?? [];
 				const snapPoints = findSnapPoints({
 					tracks,
 					playheadTime: frameTime,
@@ -139,10 +135,10 @@ export function useTimelinePlayhead({
 			setIsDraggingRuler(true);
 			setHasDraggedRuler(false);
 
-		editor.playback.setScrubbing({ isScrubbing: true });
-		handleScrub({ event, snappingEnabled: false });
-	},
-	[handleScrub, playheadRef, editor.playback],
+			editor.playback.setScrubbing({ isScrubbing: true });
+			handleScrub({ event, snappingEnabled: false });
+		},
+		[handleScrub, playheadRef, editor.playback],
 	);
 
 	const handlePlayheadMouseDownEvent = useCallback(
@@ -256,17 +252,20 @@ export function useTimelinePlayhead({
 		if (!playhead) return;
 
 		const updatePosition = (time: number) => {
-			const centerPosition = time * TIMELINE_CONSTANTS.PIXELS_PER_SECOND * zoomLevel;
+			const centerPosition =
+				time * TIMELINE_CONSTANTS.PIXELS_PER_SECOND * zoomLevel;
 			const leftPosition = centerPosition - 1; // Compensação de largura
 			playhead.style.left = `${leftPosition}px`;
 		};
 
-		const handlePlaybackUpdate = (event: any) => {
+		type PlaybackEvent = CustomEvent<{ time: number }>;
+
+		const handlePlaybackUpdate = (event: PlaybackEvent) => {
 			if (isScrubbing) return;
 			updatePosition(event.detail.time);
 		};
 
-		const handlePlaybackSeek = (event: any) => {
+		const handlePlaybackSeek = (event: PlaybackEvent) => {
 			updatePosition(event.detail.time);
 		};
 

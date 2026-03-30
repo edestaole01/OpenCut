@@ -163,6 +163,7 @@ export async function GET(request: NextRequest) {
 			page_size: searchParams.get("page_size") || undefined,
 			sort: searchParams.get("sort") || undefined,
 			min_rating: searchParams.get("min_rating") || undefined,
+			commercial_only: searchParams.get("commercial_only") || undefined,
 		});
 
 		if (!validationResult.success) {
@@ -200,6 +201,20 @@ export async function GET(request: NextRequest) {
 
 		const sortParam = buildSortParameter({ query, sort });
 
+		if (!webEnv.FREESOUND_API_KEY) {
+			return NextResponse.json({
+				count: 0,
+				next: null,
+				previous: null,
+				results: [],
+				query: query || "",
+				type: type || "effects",
+				page,
+				pageSize,
+				sort,
+			});
+		}
+
 		const params = new URLSearchParams({
 			query: query || "",
 			token: webEnv.FREESOUND_API_KEY,
@@ -220,6 +235,23 @@ export async function GET(request: NextRequest) {
 		if (!response.ok) {
 			const errorText = await response.text();
 			console.error("Freesound API error:", response.status, errorText);
+
+			// Invalid/expired API token: fail gracefully so the UI keeps working.
+			if (response.status === 401 || response.status === 403) {
+				return NextResponse.json({
+					count: 0,
+					next: null,
+					previous: null,
+					results: [],
+					query: query || "",
+					type: type || "effects",
+					page,
+					pageSize,
+					sort,
+					minRating: min_rating,
+				});
+			}
+
 			return NextResponse.json(
 				{ error: "Failed to search sounds" },
 				{ status: response.status },

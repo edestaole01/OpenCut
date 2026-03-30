@@ -113,7 +113,8 @@ describe("keyframe-aware timeline commands", () => {
 			duration: 3,
 		}).execute();
 
-		const updatedElement = (updatedTracks[0].elements[0] as VideoElement).animations;
+		const updatedElement = (updatedTracks[0].elements[0] as VideoElement)
+			.animations;
 		expect(
 			updatedElement?.channels["transform.scale"]?.keyframes.map(
 				(keyframe) => keyframe.time,
@@ -213,7 +214,9 @@ describe("keyframe-aware timeline commands", () => {
 					},
 				},
 				selection: {
-					getSelectedElements: () => [{ trackId: "track-1", elementId: "element-1" }],
+					getSelectedElements: () => [
+						{ trackId: "track-1", elementId: "element-1" },
+					],
 					setSelectedElements: () => {},
 				},
 			},
@@ -226,7 +229,9 @@ describe("keyframe-aware timeline commands", () => {
 		const originalElement = updatedTracks.find(
 			(track) => track.id === "track-1",
 		)?.elements[0] as VideoElement;
-		const duplicatedTrack = updatedTracks.find((track) => track.id !== "track-1");
+		const duplicatedTrack = updatedTracks.find(
+			(track) => track.id !== "track-1",
+		);
 		const duplicatedElement = duplicatedTrack?.elements[0] as VideoElement;
 
 		expect(duplicatedElement).toBeDefined();
@@ -236,7 +241,8 @@ describe("keyframe-aware timeline commands", () => {
 			),
 		).toEqual([0, 3, 6]);
 		expect(
-			duplicatedElement.animations?.channels["transform.scale"]?.keyframes[0]?.id,
+			duplicatedElement.animations?.channels["transform.scale"]?.keyframes[0]
+				?.id,
 		).not.toBe(
 			originalElement.animations?.channels["transform.scale"]?.keyframes[0]?.id,
 		);
@@ -274,7 +280,9 @@ describe("generic keyframe commands", () => {
 		const updatedElement = updatedTracks[0].elements[0] as VideoElement;
 		const keyframes =
 			updatedElement.animations?.channels["transform.scale"]?.keyframes ?? [];
-		const atTwo = keyframes.find((keyframe) => Math.abs(keyframe.time - 2) < 0.001);
+		const atTwo = keyframes.find(
+			(keyframe) => Math.abs(keyframe.time - 2) < 0.001,
+		);
 		expect(atTwo?.value).toBe(2.5);
 	});
 
@@ -308,7 +316,9 @@ describe("generic keyframe commands", () => {
 		const keyframes =
 			updatedElement.animations?.channels["transform.scale"]?.keyframes ?? [];
 		expect(keyframes).toHaveLength(2);
-		expect(keyframes.find((keyframe) => keyframe.id === "kf-b")).toBeUndefined();
+		expect(
+			keyframes.find((keyframe) => keyframe.id === "kf-b"),
+		).toBeUndefined();
 		expect(updatedElement.transform.scale).toBe(1);
 	});
 
@@ -361,7 +371,9 @@ describe("generic keyframe commands", () => {
 
 		const updatedElement = updatedTracks[0].elements[0] as VideoElement;
 		expect(updatedElement.transform.scale).toBe(1.43);
-		expect(updatedElement.animations?.channels["transform.scale"]).toBeUndefined();
+		expect(
+			updatedElement.animations?.channels["transform.scale"],
+		).toBeUndefined();
 	});
 
 	test("upsert supports non-transform paths like opacity", () => {
@@ -425,9 +437,9 @@ describe("generic keyframe commands", () => {
 		}).execute();
 
 		const updatedElement = updatedTracks[0].elements[0] as VideoElement;
-		const keyframe = updatedElement.animations?.channels["transform.scale"]?.keyframes.find(
-			(existingKeyframe) => existingKeyframe.id === "kf-b",
-		);
+		const keyframe = updatedElement.animations?.channels[
+			"transform.scale"
+		]?.keyframes.find((existingKeyframe) => existingKeyframe.id === "kf-b");
 		expect(keyframe?.time).toBe(4);
 	});
 });

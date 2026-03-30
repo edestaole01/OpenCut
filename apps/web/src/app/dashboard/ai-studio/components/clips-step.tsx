@@ -1,684 +1,783 @@
 "use client";
-import { useState, useRef, useEffect, useMemo } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  ArrowLeft, Share2, Clock, Star, X,
-  FileText, Play, ChevronDown, ChevronUp, Maximize2,
-  Volume2, VolumeX, Search, Download, SlidersHorizontal,
+	ArrowLeft,
+	Share2,
+	Search,
+	SlidersHorizontal,
+	Zap,
+	Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ExportPanel } from "./export-panel";
-
+import dynamic from "next/dynamic";
+const VideoModal = dynamic(() =>
+	import("./video-modal").then((m) => m.VideoModal),
+);
+const ExportPanel = dynamic(() =>
+	import("./export-panel").then((m) => m.ExportPanel),
+);
+import { ClipCard } from "./clip-card";
+import { TranscriptSection } from "./transcript-section";
+import { useAssetsPanelStore } from "@/stores/assets-panel-store";
 import { useRouter } from "next/navigation";
 import { EditorCore } from "@/core";
 import { toast } from "sonner";
-import { Film } from "lucide-react";
+import { processMediaAssets } from "@/lib/media/processing";
+import { extractTimelineAudio } from "@/lib/media/mediabunny";
+import { decodeAudioToFloat32 } from "@/lib/media/audio";
+import { transcriptionService } from "@/services/transcription/service";
+import {
+	isDemoTranscript,
+	isAudioCueOnlyTranscript,
+	isMissingSpecificTranscript,
+	sanitizeCaptionText,
+	extractClipTranscript,
+	getClipTranscriptSegments,
+	wrapCaptionText,
+} from "../utils/transcript-utils";
+import type { TranscriptionResult } from "@/types/transcription";
+
+type ClipElement = {
+	id: string;
+	type: "video";
+	mediaId: string;
+	name: string;
+	startTime: number;
+	duration: number;
+	trimStart: number;
+	trimEnd: number;
+	opacity?: number;
+	transform?: {
+		position: { x: number; y: number };
+		scale: number;
+		rotate: number;
+	};
+	background?: {
+		enabled: boolean;
+		color: string;
+		cornerRadius: number;
+		paddingX: number;
+		paddingY: number;
+	};
+	textAlign?: "center";
+	fontFamily?: string;
+	color?: string;
+	fontSize?: number;
+	fontWeight?: string;
+	shadow?: {
+		enabled: boolean;
+		color: string;
+		blur: number;
+		offsetX: number;
+		offsetY: number;
+	};
+};
+
+type ClipTrack = {
+	id: string;
+	type: "video";
+	elements: ClipElement[];
+	isMain?: boolean;
+	muted?: boolean;
+	hidden?: boolean;
+};
+
+type MediaAsset = { id: string; file: File; type: "video" };
 
 interface Clip {
-  id: string;
-  title: string;
-  start: number;
-  end: number;
-  score: number;
-  tag: string;
-  caption: string;
+	id: string;
+	title: string;
+	start: number;
+	end: number;
+	score: number;
+	tag: string;
+	caption: string;
 }
 
 interface ClipsStepProps {
-  clips: Clip[];
-  videoFile: File | null;
-  videoUrl?: string;
-  transcript?: string;
-  onBack: () => void;
-  onPublish: () => void;
-  onRequestVideoReupload?: (clip: Clip) => void;
-}
-
-const scoreColor = (s: number) =>
-  s >= 80 ? "text-green-500" : s >= 60 ? "text-yellow-500" : "text-red-500";
-
-const scoreBg = (s: number) =>
-  s >= 80
-    ? "border-green-500/40 bg-green-500/5"
-    : s >= 60
-    ? "border-yellow-500/40 bg-yellow-500/5"
-    : "border-red-500/40 bg-red-500/5";
-
-const tagColor: Record<string, string> = {
-  Gancho: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-  Tutorial: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  Story: "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400",
-  Dica: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-  CTA: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-};
-
-const formatTime = (s: number) => {
-  const m = Math.floor(s / 60);
-  const sec = s % 60;
-  return `${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
-};
-
-/**
- * Extrai só a parte da transcrição que cobre o trecho start→end do clip.
- * Suporta timestamps no formato [MM:SS] ou [HH:MM:SS].
- */
-function extractClipTranscript(
-  transcript: string,
-  startSec: number,
-  endSec: number
-): string {
-  if (!transcript) return "";
-
-  // Parse timestamps like [00:00], [01:23], [1:23:45]
-  const timeRegex = /\[(\d{1,2}):(\d{2})(?::(\d{2}))?\]/g;
-
-  interface Segment { time: number; rawTag: string; index: number }
-  const markers: Segment[] = [];
-  let m: RegExpExecArray | null;
-
-  for (
-    m = timeRegex.exec(transcript);
-    m !== null;
-    m = timeRegex.exec(transcript)
-  ) {
-    const parts = m[0].replace(/\[|\]/g, "").split(":").map(Number);
-    const time = parts.length === 3
-      ? parts[0] * 3600 + parts[1] * 60 + parts[2]
-      : parts[0] * 60 + parts[1];
-    markers.push({ time, rawTag: m[0], index: m.index });
-  }
-
-  if (markers.length === 0) return transcript; // sem timestamps → devolve tudo
-
-  // Monta segmentos com texto entre timestamps
-  const segments: Array<{ time: number; text: string }> = [];
-  for (let i = 0; i < markers.length; i++) {
-    const tagEnd = markers[i].index + markers[i].rawTag.length;
-    const textEnd = i + 1 < markers.length ? markers[i + 1].index : transcript.length;
-    const text = transcript.slice(tagEnd, textEnd).trim();
-    if (text) segments.push({ time: markers[i].time, text });
-  }
-
-  // Filtra com margem de ±3s para não cortar frases que começam um pouco antes/depois
-  const margin = 3;
-  const relevant = segments.filter(
-    s => s.time >= startSec - margin && s.time <= endSec + margin
-  );
-
-  if (relevant.length === 0) {
-    // Nenhum timestamp exato → retorna mensagem orientativa
-    return `(Trecho ${formatTime(startSec)}→${formatTime(endSec)} — sem transcrição específica para este momento)`;
-  }
-
-  return relevant
-    .map(s => `[${formatTime(s.time)}] ${s.text}`)
-    .join("\n");
+	clips: Clip[];
+	videoFile: File | null;
+	videoUrl?: string;
+	transcript?: string;
+	transcriptSource?: string;
+	isMock?: boolean;
+	onBack: () => void;
+	onPublish: () => void;
+	onRequestVideoReupload?: (clip: Clip) => void;
 }
 
 const ALL_TAGS = ["Todos", "Gancho", "Tutorial", "Story", "Dica", "CTA"];
+const CAPTION_PREFILL_STORAGE_KEY = "opencut:captions-prefill";
 
-// ─── Modal expandido ──────────────────────────────────────────────────────────
-function VideoModal({
-  clip, videoUrl, transcript, onClose,
-}: { clip: Clip; videoUrl: string; transcript?: string; onClose: () => void }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [muted, setMuted] = useState(false);
-  const [playing, setPlaying] = useState(false);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    const onLoaded = () => { video.currentTime = clip.start; video.muted = false; video.volume = 1; };
-    if (video.readyState >= 1) onLoaded();
-    else video.addEventListener("loadedmetadata", onLoaded, { once: true });
-
-    const onTime = () => {
-      if (video.currentTime >= clip.end) { video.pause(); video.currentTime = clip.start; setPlaying(false); }
-    };
-    const onPlay = () => setPlaying(true);
-    const onPause = () => setPlaying(false);
-    video.addEventListener("timeupdate", onTime);
-    video.addEventListener("play", onPlay);
-    video.addEventListener("pause", onPause);
-    return () => {
-      video.removeEventListener("timeupdate", onTime);
-      video.removeEventListener("play", onPlay);
-      video.removeEventListener("pause", onPause);
-    };
-  }, [clip.start, clip.end]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  const toggleMute = () => {
-    const v = videoRef.current;
-    if (!v) return;
-    v.muted = !v.muted;
-    setMuted(v.muted);
-  };
-
-  const handlePlay = () => {
-    const v = videoRef.current;
-    if (!v) return;
-    if (playing) { v.pause(); }
-    else { v.muted = false; v.volume = 1; setMuted(false); v.play().catch(() => {}); }
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4"
-      role="button"
-      tabIndex={0}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Escape" || event.key === "Enter") {
-          onClose();
-        }
-      }}
-    >
-      <div
-        className="relative w-full max-w-5xl bg-card rounded-2xl overflow-hidden shadow-2xl flex flex-col"
-        style={{ maxHeight: "92vh" }}
-      >
-        <button
-          type="button"
-          className="absolute top-3 right-3 z-20 w-8 h-8 bg-black/60 hover:bg-black/90 rounded-full flex items-center justify-center text-white transition-colors"
-          onClick={onClose}
-        >
-          <X className="w-4 h-4" />
-        </button>
-
-        <div className="flex flex-col overflow-auto">
-          {/* Video */}
-          <div className="w-full bg-black">
-            <div className="relative">
-              <video ref={videoRef} src={videoUrl} className="w-full max-h-[52vh] object-contain" playsInline>
-                <track kind="captions" label="Legendas indisponÃ­veis" />
-              </video>
-              {!playing && (
-                <button
-                  type="button"
-                  className="absolute inset-0 flex items-center justify-center bg-black/25 hover:bg-black/35 transition-colors"
-                  onClick={handlePlay}
-                >
-                  <div className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center shadow-2xl">
-                    <Play className="w-7 h-7 text-black ml-1" />
-                  </div>
-                </button>
-              )}
-              <button
-                type="button"
-                className="absolute bottom-3 right-3 bg-black/70 hover:bg-black/90 text-white rounded-full p-2 transition-colors"
-                onClick={toggleMute}
-              >
-                {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-              </button>
-              <div className="absolute bottom-3 left-3 bg-black/60 text-white text-xs px-2 py-1 rounded-md">
-                {formatTime(clip.start)} → {formatTime(clip.end)}
-              </div>
-            </div>
-          </div>
-
-          {/* Info + Transcript */}
-          <div className="flex flex-col md:flex-row border-t">
-            <div className="md:w-[45%] p-4 space-y-3 border-b md:border-b-0 md:border-r">
-              <div className="flex items-start justify-between gap-2">
-                <h3 className="font-semibold text-base">{clip.title}</h3>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className={cn("font-bold flex items-center gap-1", scoreColor(clip.score))}>
-                    <Star className="w-4 h-4 fill-current" />{clip.score} pts
-                  </span>
-                  <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", tagColor[clip.tag] || "bg-secondary text-secondary-foreground")}>
-                    {clip.tag}
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5" />{formatTime(clip.start)} → {formatTime(clip.end)}
-                  <span className="font-semibold text-foreground ml-1">({formatTime(clip.end - clip.start)})</span>
-                </span>
-                <span className="flex items-center gap-1 text-green-600">
-                  {muted
-                    ? <><VolumeX className="w-3.5 h-3.5 text-red-500" /><span className="text-red-500">Mudo</span></>
-                    : <><Volume2 className="w-3.5 h-3.5" />Som ativado</>}
-                </span>
-              </div>
-              <div className="bg-muted/50 rounded-xl p-3">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1">
-                  <FileText className="w-3 h-3" />Caption para redes sociais
-                </p>
-                <p className="text-sm">{clip.caption}</p>
-              </div>
-            </div>
-
-            {/* Transcript */}
-            <div className="md:w-[55%] flex flex-col">
-              <div className="px-4 py-3 bg-muted/30 border-b flex items-center gap-2">
-                <FileText className="w-4 h-4 text-primary" />
-                <div>
-                  <h4 className="font-semibold text-sm">Transcrição do vídeo</h4>
-                  <p className="text-xs text-muted-foreground">Trecho: {formatTime(clip.start)} → {formatTime(clip.end)}</p>
-                </div>
-              </div>
-              <div className="p-4 overflow-y-auto max-h-52">
-                {transcript ? (
-                  <p className="text-sm leading-relaxed text-foreground/80 whitespace-pre-wrap">
-                    {extractClipTranscript(transcript, clip.start, clip.end)}
-                  </p>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-24 text-center gap-2">
-                    <FileText className="w-7 h-7 text-muted-foreground/40" />
-                    <p className="text-sm text-muted-foreground">Transcrição não disponível.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+interface CaptionPrefillPayload {
+	platform: string;
+	clipTitle: string;
+	clipCaption?: string;
+	transcript?: string;
+	score?: number;
+	source: "ai-studio";
+	createdAt: string;
 }
 
-// ─── Thumbnail no card ─────────────────────────────────────────────────────────
-function ClipThumbnail({ videoUrl, start, onClick }: { videoUrl: string; start: number; onClick: (e: React.MouseEvent) => void }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+async function transcribeClipAudio({
+	videoFile,
+	clip,
+}: {
+	videoFile: File;
+	clip: Clip;
+}): Promise<TranscriptionResult | null> {
+	try {
+		const clipDuration = Math.max(0.6, clip.end - clip.start);
+		const audioBlob = await extractTimelineAudio({
+			tracks: [
+				{
+					id: "clip-track",
+					type: "video",
+					elements: [
+						{
+							id: "clip-el",
+							type: "video",
+							mediaId: "m1",
+							name: clip.title,
+							startTime: 0,
+							duration: clipDuration,
+							trimStart: clip.start,
+							trimEnd: clip.start + clipDuration,
+						},
+					],
+					isMain: true,
+					muted: false,
+					hidden: false,
+				} satisfies ClipTrack,
+			],
+			mediaAssets: [
+				{ id: "m1", file: videoFile, type: "video" } satisfies MediaAsset,
+			],
+			totalDuration: clipDuration,
+		});
 
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    const onLoaded = () => { v.currentTime = start; };
-    if (v.readyState >= 1) onLoaded();
-    else v.addEventListener("loadedmetadata", onLoaded, { once: true });
-  }, [start]);
-
-  return (
-    <button
-      type="button"
-      className="relative w-full aspect-video bg-black rounded-lg overflow-hidden group cursor-pointer"
-      onClick={onClick}
-    >
-      <video ref={videoRef} src={videoUrl} className="w-full h-full object-cover" preload="metadata" muted />
-      <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-        <div className="w-11 h-11 rounded-full bg-white/90 flex items-center justify-center shadow-xl">
-          <Play className="w-5 h-5 text-black ml-0.5" />
-        </div>
-      </div>
-      <div className="absolute top-1.5 left-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-        <div className="bg-black/60 rounded-md p-1"><Maximize2 className="w-3 h-3 text-white" /></div>
-      </div>
-    </button>
-  );
+		const { samples, sampleRate } = await decodeAudioToFloat32({ audioBlob });
+		try {
+			return await transcriptionService.transcribe({
+				audioData: audioBlob,
+				samples: samples,
+				useRemote: true,
+				sampleRate,
+			});
+		} catch (remoteErr) {
+			console.warn(
+				"Remote per-clip transcription failed, forcing local:",
+				remoteErr,
+			);
+			try {
+				return await transcriptionService.transcribe({
+					audioData: samples,
+					useRemote: false,
+					sampleRate,
+				});
+			} catch (localErr) {
+				console.error("Local per-clip transcription also failed:", localErr);
+				return null;
+			}
+		}
+	} catch (error) {
+		console.warn("Per-clip transcription failed", error);
+		return null;
+	}
 }
 
-// ─── Componente principal ──────────────────────────────────────────────────────
 export function ClipsStep({
-  clips: initialClips,
-  videoFile,
-  videoUrl: initialVideoUrl,
-  transcript,
-  onBack,
-  onPublish,
-  onRequestVideoReupload,
+	clips: initialClips,
+	videoFile,
+	videoUrl: initialVideoUrl,
+	transcript,
+	transcriptSource,
+	isMock = false,
+	onBack,
+	onPublish,
+	onRequestVideoReupload,
 }: ClipsStepProps) {
-  const router = useRouter();
-  const [clips, setClips] = useState(initialClips);
-  const [selectedClips, setSelectedClips] = useState<string[]>(initialClips.map(c => c.id));
-  const [showTranscript, setShowTranscript] = useState(false);
-  const [activeClip, setActiveClip] = useState<Clip | null>(null);
-  const [exportClip, setExportClip] = useState<Clip | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string | null>(initialVideoUrl ?? null);
-  const [search, setSearch] = useState("");
-  const [activeTag, setActiveTag] = useState("Todos");
-  const [sortBy, setSortBy] = useState<"score" | "start">("score");
+	const router = useRouter();
+	const setActiveAssetsTab = useAssetsPanelStore((state) => state.setActiveTab);
 
-  useEffect(() => {
-    if (!videoFile) {
-      setVideoUrl(initialVideoUrl ?? null);
-      return;
-    }
-    const url = URL.createObjectURL(videoFile);
-    setVideoUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [videoFile, initialVideoUrl]);
+	const [clips, setClips] = useState(initialClips);
+	const [selectedClips, setSelectedClips] = useState<string[]>(
+		initialClips.map((c) => c.id),
+	);
+	const [showTranscript, setShowTranscript] = useState(false);
+	const [activeClip, setActiveClip] = useState<Clip | null>(null);
+	const [exportClip, setExportClip] = useState<Clip | null>(null);
+	const [exportVideoFile, setExportVideoFile] = useState<File | null>(
+		videoFile,
+	);
+	const [videoUrl, setVideoUrl] = useState<string | null>(
+		initialVideoUrl ?? null,
+	);
+	const [isResolving, setIsResolving] = useState<string | null>(null);
+	const [search, setSearch] = useState("");
+	const [activeTag, setActiveTag] = useState("Todos");
+	const [sortBy, setSortBy] = useState<"score" | "start">("score");
+	const [editableTranscript, setEditableTranscript] = useState(
+		isAudioCueOnlyTranscript(transcript || "") ? "" : transcript || "",
+	);
+	const [isEditingTranscript, setIsEditingTranscript] = useState(false);
 
-  const filtered = useMemo(() => {
-    let list = [...clips];
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(c =>
-        c.title.toLowerCase().includes(q) ||
-        c.caption.toLowerCase().includes(q) ||
-        c.tag.toLowerCase().includes(q)
-      );
-    }
-    if (activeTag !== "Todos") list = list.filter(c => c.tag === activeTag);
-    if (sortBy === "score") list.sort((a, b) => b.score - a.score);
-    else list.sort((a, b) => a.start - b.start);
-    return list;
-  }, [clips, search, activeTag, sortBy]);
+	const userProvidedTranscript = useMemo(() => {
+		const current = (editableTranscript || "").trim();
+		if (!current) return false;
+		return current !== (transcript || "").trim();
+	}, [editableTranscript, transcript]);
 
-  const toggleClip = (id: string) =>
-    setSelectedClips(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
+	const transcriptIsDemo = useMemo(() => {
+		const sourceIsMock = transcriptSource === "mock" || isMock;
+		const textLooksDemo = isDemoTranscript(editableTranscript || "");
+		const textLooksAudioCueOnly = isAudioCueOnlyTranscript(
+			editableTranscript || "",
+		);
+		return (
+			(sourceIsMock || textLooksDemo || textLooksAudioCueOnly) &&
+			!userProvidedTranscript
+		);
+	}, [transcriptSource, isMock, editableTranscript, userProvidedTranscript]);
 
-  const removeClip = (id: string) => {
-    setClips(prev => prev.filter(c => c.id !== id));
-    setSelectedClips(prev => prev.filter(c => c !== id));
-  };
+	useEffect(() => {
+		if (isAudioCueOnlyTranscript(transcript || "")) {
+			setEditableTranscript("");
+			return;
+		}
+		setEditableTranscript(transcript || "");
+	}, [transcript]);
 
-  const handleEditInTimeline = async (clip: Clip) => {
-    if (!videoFile) {
-      if (onRequestVideoReupload) {
-        onRequestVideoReupload(clip);
-        toast.info("Selecione o vídeo original para continuar editando.");
-      }
-      return;
-    }
+	useEffect(() => {
+		if (!videoFile) {
+			setVideoUrl(initialVideoUrl ?? null);
+			return;
+		}
+		const url = URL.createObjectURL(videoFile);
+		setVideoUrl(url);
+		return () => URL.revokeObjectURL(url);
+	}, [videoFile, initialVideoUrl]);
 
-    const toastId = toast.loading("Preparando editor...");
-    try {
-      const editor = EditorCore.getInstance();
-      
-      // 1. Criar novo projeto (com metadados persistidos)
-      const projectId = await editor.project.createNewProject({ 
-        name: `Clip: ${clip.title}` 
-      });
+	const filtered = useMemo(() => {
+		let list = [...clips];
+		if (search.trim()) {
+			const q = search.toLowerCase();
+			list = list.filter(
+				(c) =>
+					c.title.toLowerCase().includes(q) ||
+					c.caption.toLowerCase().includes(q) ||
+					c.tag.toLowerCase().includes(q),
+			);
+		}
+		if (activeTag !== "Todos") list = list.filter((c) => c.tag === activeTag);
+		if (sortBy === "score") list.sort((a, b) => b.score - a.score);
+		else list.sort((a, b) => a.start - b.start);
+		return list;
+	}, [clips, search, activeTag, sortBy]);
 
-      // 2. Adicionar o vídeo como asset
-      const videoUrl = URL.createObjectURL(videoFile);
+	const toggleClip = useCallback((id: string) => {
+		setSelectedClips((prev) =>
+			prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id],
+		);
+	}, []);
 
-      const assetId = await editor.media.addMediaAsset({
-        projectId,
-        asset: {
-          name: videoFile.name,
-          type: "video",
-          file: videoFile,
-          url: videoUrl,
-          size: videoFile.size,
-        } as any
-      });
+	const removeClip = useCallback((id: string) => {
+		setClips((prev) => prev.filter((c) => c.id !== id));
+		setSelectedClips((prev) => prev.filter((c) => c !== id));
+	}, []);
 
-      // 3. Inserir clip na timeline
-      editor.timeline.insertElement({
-        placement: { mode: "auto", trackType: "video" },
-        element: {
-          type: "video",
-          mediaId: assetId,
-          name: clip.title,
-          startTime: 0,
-          trimStart: clip.start,
-          trimEnd: 0,
-          duration: clip.end - clip.start,
-          transform: { position: { x: 0, y: 0 }, scale: 1, rotate: 0 },
-          opacity: 1,
-        } as any
-      });
+	const resolveSourceVideoFile = useCallback(async (): Promise<File | null> => {
+		// Se a URL é do servidor (histórico), busca dela primeiro para garantir o arquivo correto.
+		// Não usa videoFile como atalho pois pode ser de um upload diferente na mesma sessão.
+		if (videoUrl && !videoUrl.startsWith("blob:")) {
+			try {
+				// Tenta a URL de streaming dedicada (suporta Range requests)
+				const apiUrl = `/api/ai-studio/file?path=${encodeURIComponent(videoUrl)}`;
+				const response = await fetch(apiUrl);
+				if (response.ok) {
+					const blob = await response.blob();
+					const rawName = videoUrl.split("?")[0]?.split("/").pop() || "video.mp4";
+					return new File([blob], decodeURIComponent(rawName), {
+						type: blob.type || "video/mp4",
+					});
+				}
+			} catch (error) {
+				console.warn("Could not resolve video file from API route:", error);
+			}
+			// Fallback: tenta URL direta (funciona em produção via CDN)
+			try {
+				const response = await fetch(videoUrl);
+				if (response.ok) {
+					const blob = await response.blob();
+					const rawName = videoUrl.split("?")[0]?.split("/").pop() || "video.mp4";
+					return new File([blob], decodeURIComponent(rawName), {
+						type: blob.type || "video/mp4",
+					});
+				}
+			} catch {
+				// Ignora — cai no videoFile abaixo
+			}
+		}
 
-      // 4. Adicionar a Legenda (Track de Texto)
-      if (clip.caption) {
-        editor.timeline.insertElement({
-          placement: { mode: "auto", trackType: "text" },
-          element: {
-            type: "text",
-            name: "Legenda AI",
-            content: clip.caption,
-            startTime: 0,
-            duration: clip.end - clip.start,
-            trimStart: 0,
-            trimEnd: 0,
-            fontSize: 48,
-            fontFamily: "Inter",
-            color: "#ffffff",
-            textAlign: "center",
-            fontWeight: "bold",
-            transform: { position: { x: 0, y: 180 }, scale: 1, rotate: 0 },
-            opacity: 1,
-            background: { enabled: true, color: "rgba(0,0,0,0.5)", cornerRadius: 4, paddingX: 10, paddingY: 5 }
-          } as any
-        });
-      }
+		// Blob URL da sessão atual
+		if (videoUrl?.startsWith("blob:")) {
+			try {
+				const check = await fetch(videoUrl, { method: "HEAD" }).catch(() => null);
+				if (check?.ok) {
+					const response = await fetch(videoUrl);
+					if (response.ok) {
+						const blob = await response.blob();
+						const rawName = videoUrl.split("?")[0]?.split("/").pop() || "video.mp4";
+						return new File([blob], decodeURIComponent(rawName), {
+							type: blob.type || "video/mp4",
+						});
+					}
+				}
+			} catch (error) {
+				console.warn("Could not resolve blob URL:", error);
+			}
+		}
 
-      // Salvar projeto com a timeline antes de navegar
-      await editor.project.saveCurrentProject();
+		// Último recurso: arquivo em memória da sessão atual
+		if (videoFile) return videoFile;
 
-      toast.success("Clip aberto no editor!", { id: toastId });
-      router.push(`/editor/${projectId}`);
-    } catch (err) {
-      console.error("Erro ao abrir no editor:", err);
-      toast.error("Não foi possível abrir o editor.", { id: toastId });
-    }
-  };
+		return null;
+	}, [videoFile, videoUrl]);
 
-  return (
-    <div className="space-y-5">
-      {/* Modals */}
-      {activeClip && videoUrl && (
-        <VideoModal clip={activeClip} videoUrl={videoUrl} transcript={transcript} onClose={() => setActiveClip(null)} />
-      )}
-      {exportClip && videoFile && (
-        <ExportPanel clip={exportClip} videoFile={videoFile} onClose={() => setExportClip(null)} />
-      )}
+	const handleExportClip = useCallback(
+		async (clip: Clip) => {
+			setIsResolving(clip.id);
+			const sourceVideoFile = await resolveSourceVideoFile();
+			setIsResolving(null);
+			if (!sourceVideoFile) {
+				if (onRequestVideoReupload) {
+					onRequestVideoReupload(clip);
+					toast.info("Por favor, reconecte o vídeo original para exportar.");
+				} else {
+					toast.error(
+						"Vídeo original não disponível. Tente reenviar o arquivo.",
+					);
+				}
+				return;
+			}
+			setExportVideoFile(sourceVideoFile);
+			setExportClip(clip);
+		},
+		[resolveSourceVideoFile, onRequestVideoReupload],
+	);
 
-      {/* Banner: análise do histórico sem vídeo */}
-      {!videoFile && onRequestVideoReupload && (
-        <div className="flex items-center gap-3 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 text-sm">
-          <Film className="w-4 h-4 text-yellow-600 dark:text-yellow-400 shrink-0" />
-          <p className="flex-1 text-yellow-800 dark:text-yellow-300">
-            Análise carregada do histórico. Para <strong>editar no timeline</strong> ou <strong>exportar</strong>, selecione o vídeo original.
-          </p>
-          <button
-            type="button"
-            className="text-yellow-700 dark:text-yellow-400 underline text-xs shrink-0"
-            onClick={() => onRequestVideoReupload(clips[0])}
-          >
-            Selecionar vídeo
-          </button>
-        </div>
-      )}
+	const handleOpenCaptionGenerator = useCallback(
+		(clip: Clip) => {
+			let transcriptForCaption = "";
+			const transcriptSeed = editableTranscript.trim();
+			if (transcriptSeed && !isDemoTranscript(transcriptSeed)) {
+				const extracted = extractClipTranscript(
+					transcriptSeed,
+					clip.start,
+					clip.end,
+				);
+				if (extracted && !isMissingSpecificTranscript(extracted)) {
+					transcriptForCaption = sanitizeCaptionText(extracted);
+				}
+			}
+			const payload: CaptionPrefillPayload = {
+				source: "ai-studio",
+				createdAt: new Date().toISOString(),
+				platform: "instagram",
+				clipTitle: clip.title,
+				clipCaption: clip.caption || undefined,
+				transcript: transcriptForCaption || undefined,
+				score: Number.isFinite(clip.score) ? clip.score : undefined,
+			};
+			if (typeof window !== "undefined") {
+				window.sessionStorage.setItem(
+					CAPTION_PREFILL_STORAGE_KEY,
+					JSON.stringify(payload),
+				);
+			}
+			router.push("/dashboard/captions");
+		},
+		[editableTranscript, router],
+	);
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold">{clips.length} clips encontrados</h2>
-          <p className="text-muted-foreground text-sm">{selectedClips.length} selecionados</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={onBack}>
-            <ArrowLeft className="w-4 h-4 mr-2" />Voltar
-          </Button>
-          <Button onClick={onPublish} disabled={selectedClips.length === 0}>
-            <Share2 className="w-4 h-4 mr-2" />Publicar
-          </Button>
-        </div>
-      </div>
+	const handleEditInTimeline = useCallback(
+		async (clip: Clip) => {
+			setIsResolving(clip.id);
+			const sourceVideoFile = await resolveSourceVideoFile();
+			if (!sourceVideoFile) {
+				setIsResolving(null);
+				if (onRequestVideoReupload) {
+					onRequestVideoReupload(clip);
+					toast.info("Por favor, reconecte o vídeo original para editar.");
+				} else {
+					toast.error(
+						"Não foi possível carregar o vídeo original deste projeto.",
+					);
+				}
+				return;
+			}
+			const toastId = toast.loading("Preparando editor...");
+			try {
+				EditorCore.reset();
+				const editor = EditorCore.getInstance();
 
-      {/* Search + filters */}
-      <div className="space-y-3">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Pesquisar clips, captions, tags..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setSortBy(s => s === "score" ? "start" : "score")}
-            title={sortBy === "score" ? "Ordenar por tempo" : "Ordenar por score"}
-          >
-            <SlidersHorizontal className="w-4 h-4" />
-          </Button>
-        </div>
+				const perClipResult = await transcribeClipAudio({
+					videoFile: sourceVideoFile,
+					clip,
+				});
 
-        {/* Tag filter */}
-        <div className="flex gap-2 flex-wrap">
-          {ALL_TAGS.map(tag => (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => setActiveTag(tag)}
-              className={cn(
-                "px-3 py-1 rounded-full text-xs font-medium border transition-colors",
-                activeTag === tag
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "border-border hover:bg-muted"
-              )}
-            >
-              {tag}
-            </button>
-          ))}
-          <span className="text-xs text-muted-foreground self-center ml-auto">
-            {sortBy === "score" ? "↓ Maior score" : "↓ Cronológico"}
-          </span>
-        </div>
-      </div>
+				const projectId = await editor.project.createNewProject({
+					name: `Clip: ${clip.title}`,
+					settings: { canvasSize: { width: 1080, height: 1920 } },
+				});
 
-      {/* Transcript collapsible */}
-      {transcript && (
-        <div className="border rounded-xl overflow-hidden">
-          <button
-            type="button"
-            className="w-full flex items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted/70 transition-colors text-sm font-medium"
-            onClick={() => setShowTranscript(v => !v)}
-          >
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-primary" />
-              Transcrição completa do vídeo
-            </div>
-            {showTranscript ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-          </button>
-          {showTranscript && (
-            <div className="p-4 text-sm text-muted-foreground leading-relaxed max-h-52 overflow-y-auto border-t whitespace-pre-wrap">
-              {transcript}
-            </div>
-          )}
-        </div>
-      )}
+				const [processedAsset] = await processMediaAssets({
+					files: [sourceVideoFile],
+				});
+				if (!processedAsset)
+					throw new Error(
+						"Falha ao processar o arquivo de vídeo para timeline",
+					);
 
-      {/* Clips grid */}
-      {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
-          <Search className="w-10 h-10 text-muted-foreground/30" />
-          <p className="text-muted-foreground">Nenhum clip encontrado para &ldquo;{search}&rdquo;</p>
-          <Button variant="outline" size="sm" onClick={() => { setSearch(""); setActiveTag("Todos"); }}>
-            Limpar filtros
-          </Button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {filtered.map(clip => {
-            const isSelected = selectedClips.includes(clip.id);
-            return (
-              <Card
-                key={clip.id}
-                className={cn(
-                  "cursor-pointer transition-all relative overflow-hidden",
-                  isSelected
-                    ? `border-2 ring-1 ring-primary/30 ${scoreBg(clip.score)}`
-                    : "hover:shadow-md hover:border-muted-foreground/40"
-                )}
-                onClick={() => toggleClip(clip.id)}
-              >
-                {/* Remove button */}
-                <button
-                  type="button"
-                  className="absolute top-2 right-2 z-10 w-6 h-6 bg-background/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-destructive hover:text-white transition-colors"
-                  onClick={e => { e.stopPropagation(); removeClip(clip.id); }}
-                >
-                  <X className="w-3 h-3" />
-                </button>
+				const assetId = await editor.media.addMediaAsset({
+					projectId,
+					asset: processedAsset,
+				});
 
-                <CardContent className="p-0">
-                  <div className="flex">
-                    {/* Thumbnail */}
-                    <div className="w-44 flex-shrink-0 p-3">
-                      {videoUrl ? (
-                        <>
-                          <ClipThumbnail
-                            videoUrl={videoUrl}
-                            start={clip.start}
-                            onClick={e => { e.stopPropagation(); setActiveClip(clip); }}
-                          />
-                          <p className="text-center text-xs text-muted-foreground mt-1.5 flex items-center justify-center gap-1">
-                            <Maximize2 className="w-3 h-3" />Expandir
-                          </p>
-                        </>
-                      ) : (
-                        <div className="w-full aspect-video bg-muted rounded-lg flex flex-col items-center justify-center gap-1">
-                          <span className="text-3xl">🎬</span>
-                        </div>
-                      )}
-                    </div>
+				const clipDuration = clip.end - clip.start;
+				editor.timeline.insertElement({
+					placement: { mode: "auto", trackType: "video" },
+					element: {
+						type: "video",
+						mediaId: assetId,
+						name: clip.title,
+						startTime: 0,
+						trimStart: clip.start,
+						trimEnd: clip.end,
+						duration: clipDuration,
+						transform: { position: { x: 0, y: 0 }, scale: 1, rotate: 0 },
+						opacity: 1,
+					} as unknown as Parameters<
+						typeof editor.timeline.insertElement
+					>[0]["element"],
+				});
 
-                    {/* Info */}
-                    <div className="flex-1 p-3 pr-8 space-y-2 min-w-0">
-                      <div className="flex items-center justify-between gap-1">
-                        <div className={cn("flex items-center gap-1 font-bold", scoreColor(clip.score))}>
-                          <Star className="w-3.5 h-3.5 fill-current" />
-                          <span className="text-base">{clip.score}</span>
-                          <span className="text-xs font-normal text-muted-foreground">pts</span>
-                        </div>
-                        <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", tagColor[clip.tag] || "bg-secondary text-secondary-foreground")}>
-                          {clip.tag}
-                        </span>
-                      </div>
+				let clipTranscriptSegments: Array<{
+					startTime: number;
+					duration: number;
+					content: string;
+				}> = [];
+				let finalTranscriptText = "";
 
-                      <p className="font-semibold text-sm leading-tight">{clip.title}</p>
+				if (perClipResult?.segments && perClipResult.segments.length > 0) {
+					finalTranscriptText = perClipResult.text;
+					for (const segment of perClipResult.segments) {
+						if (segment.words && segment.words.length > 0) {
+							const wordsPerChunk = 3;
+							for (let i = 0; i < segment.words.length; i += wordsPerChunk) {
+								const chunkWords = segment.words.slice(i, i + wordsPerChunk);
+								const content = wrapCaptionText(
+									chunkWords.map((w) => w.word).join(" "),
+									18,
+								);
+								const startTime = chunkWords[0].start;
+								const duration = Math.max(
+									0.6,
+									chunkWords[chunkWords.length - 1].end - startTime,
+								);
+								clipTranscriptSegments.push({ startTime, duration, content });
+							}
+						} else {
+							clipTranscriptSegments.push({
+								startTime: segment.start,
+								duration: Math.max(0.8, segment.end - segment.start),
+								content: wrapCaptionText(segment.text, 18),
+							});
+						}
+					}
+				} else {
+					const cleanedGlobal = (transcript || "").trim();
+					if (cleanedGlobal && !isDemoTranscript(cleanedGlobal)) {
+						const relevantSegments = getClipTranscriptSegments(
+							cleanedGlobal,
+							clip.start,
+							clip.end,
+						);
+						clipTranscriptSegments = relevantSegments.map((s) => ({
+							startTime: Math.max(0, s.start - clip.start),
+							duration: Math.max(
+								0.8,
+								Math.min(clip.end, s.end) - Math.max(clip.start, s.start),
+							),
+							content: wrapCaptionText(s.text, 18),
+						}));
+						finalTranscriptText = relevantSegments.map((s) => s.text).join(" ");
+					}
+				}
 
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Clock className="w-3 h-3" />
-                        <span>{formatTime(clip.start)} → {formatTime(clip.end)}</span>
-                        <span className="ml-auto font-semibold text-foreground">{formatTime(clip.end - clip.start)}</span>
-                      </div>
+				if (clipTranscriptSegments.length > 0 || finalTranscriptText) {
+					const masterTrackId = editor.timeline.addTrack({ type: "text" });
+					editor.timeline.insertElement({
+						placement: { mode: "explicit", trackId: masterTrackId },
+						element: {
+							type: "text",
+							name: "Transcricao AI",
+							content:
+								finalTranscriptText ||
+								clip.caption ||
+								"Sem transcrição disponível",
+							startTime: 0,
+							duration: clipDuration,
+							hidden: true,
+						} as unknown as Parameters<
+							typeof editor.timeline.insertElement
+						>[0]["element"],
+					});
 
-                      <div className="border-t pt-2">
-                        <p className="text-xs leading-relaxed line-clamp-2 text-foreground/80">{clip.caption}</p>
-                      </div>
+					const captionsTrackId = editor.timeline.addTrack({ type: "text" });
+					clipTranscriptSegments.forEach((segment, index) => {
+						editor.timeline.insertElement({
+							placement: { mode: "explicit", trackId: captionsTrackId },
+							element: {
+								type: "text",
+								name: `Caption ${index + 1}`,
+								content: segment.content.toUpperCase(),
+								startTime: segment.startTime,
+								duration: segment.duration,
+								fontSize: 4.5,
+								fontFamily: "Inter",
+								color: "#ffffff",
+								textAlign: "center",
+								fontWeight: "900",
+								transform: { position: { x: 0, y: 480 }, scale: 1, rotate: 0 },
+								shadow: {
+									enabled: true,
+									color: "rgba(0,0,0,0.8)",
+									blur: 4,
+									offsetX: 2,
+									offsetY: 2,
+								},
+								background: {
+									enabled: true,
+									color: "rgba(0,0,0,0.85)",
+									cornerRadius: 8,
+									paddingX: 30,
+									paddingY: 15,
+								},
+							} as unknown as Parameters<
+								typeof editor.timeline.insertElement
+							>[0]["element"],
+						});
+					});
+				}
 
-                      {/* Actions */}
-                      <div className="flex flex-wrap gap-1.5 pt-0.5">
-                        <Button
-                          size="sm" variant="outline"
-                          className="flex-1 text-xs h-7 gap-1 min-w-[80px]"
-                          onClick={e => { e.stopPropagation(); setExportClip(clip); }}
-                        >
-                          <Download className="w-3 h-3" />Baixar
-                        </Button>
-                        <Button
-                          size="sm" variant="outline"
-                          className="flex-1 text-xs h-7 gap-1 min-w-[80px]"
-                          onClick={e => { e.stopPropagation(); handleEditInTimeline(clip); }}
-                        >
-                          <Film className="w-3 h-3" />Editar
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="w-full text-xs h-7 gap-1 mt-1"
-                          onClick={e => { e.stopPropagation(); onPublish(); }}
-                        >
-                          <Share2 className="w-3 h-3" />Publicar
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
+				await editor.project.saveCurrentProject();
+
+				if (typeof window !== "undefined" && finalTranscriptText) {
+					window.sessionStorage.setItem(
+						`opencut:project-transcript:${projectId}`,
+						finalTranscriptText,
+					);
+				}
+
+				toast.success("Clip aberto no editor!", { id: toastId });
+				setActiveAssetsTab("captions");
+				setIsResolving(null);
+				router.push(`/editor/${projectId}`);
+			} catch (err) {
+				console.error("Erro ao abrir no editor:", err);
+				setIsResolving(null);
+				toast.error("Não foi possível abrir o editor.", { id: toastId });
+			}
+		},
+		[
+			resolveSourceVideoFile,
+			onRequestVideoReupload,
+			transcript,
+			setActiveAssetsTab,
+			router,
+		],
+	);
+
+	const handleDiscardTranscript = useCallback(() => {
+		setEditableTranscript(transcript || "");
+		setIsEditingTranscript(false);
+	}, [transcript]);
+
+	const handleSaveTranscript = useCallback(() => {
+		setIsEditingTranscript(false);
+		toast.success("Transcrição atualizada localmente!");
+	}, []);
+
+	return (
+		<div className="space-y-5">
+			{activeClip && videoUrl && (
+				<VideoModal
+					clip={activeClip}
+					videoUrl={videoUrl}
+					transcript={transcript}
+					onClose={() => setActiveClip(null)}
+				/>
+			)}
+			{exportClip && exportVideoFile && (
+				<ExportPanel
+					clip={exportClip}
+					videoFile={exportVideoFile}
+					onClose={() => {
+						setExportClip(null);
+						setExportVideoFile(null);
+					}}
+				/>
+			)}
+
+			{!videoFile && !videoUrl && onRequestVideoReupload && (
+				<div className="flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 px-5 py-4 text-sm animate-in slide-in-from-top-2 duration-500 shadow-sm">
+					<div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
+						<Zap className="w-5 h-5 text-primary" />
+					</div>
+					<div className="flex-1 space-y-0.5">
+						<p className="font-semibold text-foreground">
+							Reconecte seu vídeo para editar
+						</p>
+						<p className="text-muted-foreground text-xs">
+							Não encontramos uma cópia local do vídeo. Selecione o arquivo
+							original para abrir na timeline ou exportar.
+						</p>
+					</div>
+					<Button
+						size="sm"
+						className="shrink-0 gap-2"
+						onClick={() => onRequestVideoReupload(clips[0])}
+					>
+						<Plus className="w-4 h-4" /> Selecionar Arquivo
+					</Button>
+				</div>
+			)}
+
+			{transcriptIsDemo && (
+				<div className="rounded-lg border border-amber-300/40 bg-amber-500/5 px-4 py-3 text-xs text-amber-700 dark:text-amber-300">
+					Esta análise está em modo demonstração. O texto mostrado não é a
+					transcrição real do vídeo.
+				</div>
+			)}
+
+			<div className="flex items-center justify-between">
+				<div>
+					<h2 className="text-xl font-semibold">
+						{clips.length} clips encontrados
+					</h2>
+					<p className="text-muted-foreground text-sm">
+						{selectedClips.length} selecionados
+					</p>
+				</div>
+				<div className="flex gap-2">
+					<Button variant="outline" onClick={onBack}>
+						<ArrowLeft className="w-4 h-4 mr-2" />
+						Voltar
+					</Button>
+					<Button onClick={onPublish} disabled={selectedClips.length === 0}>
+						<Share2 className="w-4 h-4 mr-2" />
+						Publicar
+					</Button>
+				</div>
+			</div>
+
+			<div className="space-y-3">
+				<div className="flex gap-2">
+					<div className="relative flex-1">
+						<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+						<Input
+							placeholder="Pesquisar clips, captions, tags..."
+							value={search}
+							onChange={(e) => setSearch(e.target.value)}
+							className="pl-9"
+						/>
+					</div>
+					<Button
+						variant="outline"
+						size="icon"
+						onClick={() =>
+							setSortBy((s) => (s === "score" ? "start" : "score"))
+						}
+						title={
+							sortBy === "score" ? "Ordenar por tempo" : "Ordenar por score"
+						}
+					>
+						<SlidersHorizontal className="w-4 h-4" />
+					</Button>
+				</div>
+
+				<div className="flex gap-2 flex-wrap">
+					{ALL_TAGS.map((tag) => (
+						<button
+							key={tag}
+							type="button"
+							onClick={() => setActiveTag(tag)}
+							className={cn(
+								"px-3 py-1 rounded-full text-xs font-medium border transition-colors",
+								activeTag === tag
+									? "bg-primary text-primary-foreground border-primary"
+									: "border-border hover:bg-muted",
+							)}
+						>
+							{tag}
+						</button>
+					))}
+					<span className="text-xs text-muted-foreground self-center ml-auto">
+						{sortBy === "score" ? "↓ Maior score" : "↓ Cronológico"}
+					</span>
+				</div>
+			</div>
+
+			<TranscriptSection
+				transcript={editableTranscript}
+				isEditing={isEditingTranscript}
+				isVisible={showTranscript}
+				onToggleVisible={() => setShowTranscript((v) => !v)}
+				onToggleEditing={() => setIsEditingTranscript((v) => !v)}
+				onChange={setEditableTranscript}
+				onDiscard={handleDiscardTranscript}
+				onSave={handleSaveTranscript}
+			/>
+
+			{filtered.length === 0 ? (
+				<div className="flex flex-col items-center justify-center py-16 text-center gap-3">
+					<Search className="w-10 h-10 text-muted-foreground/30" />
+					<p className="text-muted-foreground">
+						Nenhum clip encontrado para &ldquo;{search}&rdquo;
+					</p>
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={() => {
+							setSearch("");
+							setActiveTag("Todos");
+						}}
+					>
+						Limpar filtros
+					</Button>
+				</div>
+			) : (
+				<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+					{filtered.map((clip) => (
+						<ClipCard
+							key={clip.id}
+							clip={clip}
+							isSelected={selectedClips.includes(clip.id)}
+							isResolving={isResolving === clip.id}
+							videoUrl={videoUrl}
+							onToggle={toggleClip}
+							onRemove={removeClip}
+							onExpand={setActiveClip}
+							onExport={handleExportClip}
+							onEditInTimeline={handleEditInTimeline}
+							onOpenCaptionGenerator={handleOpenCaptionGenerator}
+						/>
+					))}
+				</div>
+			)}
+		</div>
+	);
 }

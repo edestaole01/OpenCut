@@ -64,9 +64,15 @@ function drawTextDecoration({
 }): void {
 	if (textDecoration === "none" || !textDecoration) return;
 
-	const thickness = Math.max(1, scaledFontSize * TEXT_DECORATION_THICKNESS_RATIO);
+	const thickness = Math.max(
+		1,
+		scaledFontSize * TEXT_DECORATION_THICKNESS_RATIO,
+	);
 	const ascent = getMetricAscent({ metrics, fallbackFontSize: scaledFontSize });
-	const descent = getMetricDescent({ metrics, fallbackFontSize: scaledFontSize });
+	const descent = getMetricDescent({
+		metrics,
+		fallbackFontSize: scaledFontSize,
+	});
 
 	let xStart = -lineWidth / 2;
 	if (textAlign === "left") xStart = 0;
@@ -132,7 +138,16 @@ export class TextNode extends BaseNode<TextNodeParams> {
 		const fontString = `${fontStyle} ${fontWeight} ${scaledFontSize}px ${fontFamily}, sans-serif`;
 		const letterSpacing = this.params.letterSpacing ?? 0;
 		const lineHeight = this.params.lineHeight ?? DEFAULT_LINE_HEIGHT;
-		const lines = this.params.content.split("\n");
+		const applyTextTransform = (text: string): string => {
+			switch (this.params.textTransform) {
+				case "uppercase": return text.toUpperCase();
+				case "lowercase": return text.toLowerCase();
+				case "capitalize": return text.replace(/\b\p{L}/gu, (c) => c.toUpperCase());
+				case "sentence": return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+				default: return text;
+			}
+		};
+		const lines = this.params.content.split("\n").map(applyTextTransform);
 		const lineHeightPx = scaledFontSize * lineHeight;
 		const fontSizeRatio = this.params.fontSize / DEFAULT_TEXT_ELEMENT.fontSize;
 		const baseline = this.params.textBaseline ?? "middle";
@@ -142,19 +157,25 @@ export class TextNode extends BaseNode<TextNodeParams> {
 				: "source-over"
 		) as GlobalCompositeOperation;
 
-	renderer.context.save();
+		renderer.context.save();
 		renderer.context.font = fontString;
 		renderer.context.textBaseline = baseline;
 		if ("letterSpacing" in renderer.context) {
-			(renderer.context as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${letterSpacing}px`;
+			(
+				renderer.context as CanvasRenderingContext2D & { letterSpacing: string }
+			).letterSpacing = `${letterSpacing}px`;
 		}
 		const lineMetrics = lines.map((line) => renderer.context.measureText(line));
 		renderer.context.restore();
 
 		const lineCount = lines.length;
-		const block = measureTextBlock({ lineMetrics, lineHeightPx, fallbackFontSize: scaledFontSize });
+		const block = measureTextBlock({
+			lineMetrics,
+			lineHeightPx,
+			fallbackFontSize: scaledFontSize,
+		});
 
-	const textColor = resolveColorAtTime({
+		const textColor = resolveColorAtTime({
 			baseColor: this.params.color,
 			animations: this.params.animations,
 			propertyPath: "color",
@@ -201,13 +222,17 @@ export class TextNode extends BaseNode<TextNodeParams> {
 			}),
 		};
 
-	const drawContent = (ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D) => {
+		const drawContent = (
+			ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+		) => {
 			ctx.font = fontString;
 			ctx.textAlign = this.params.textAlign;
 			ctx.textBaseline = baseline;
 			ctx.fillStyle = textColor;
 			if ("letterSpacing" in ctx) {
-				(ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${letterSpacing}px`;
+				(
+					ctx as CanvasRenderingContext2D & { letterSpacing: string }
+				).letterSpacing = `${letterSpacing}px`;
 			}
 
 			if (
@@ -223,13 +248,25 @@ export class TextNode extends BaseNode<TextNodeParams> {
 					fontSizeRatio,
 				});
 				if (backgroundRect) {
-					const p = clamp({ value: resolvedBackground.cornerRadius, min: CORNER_RADIUS_MIN, max: CORNER_RADIUS_MAX }) / 100;
-					const radius = Math.min(backgroundRect.width, backgroundRect.height) / 2 * p;
-				ctx.fillStyle = resolvedBackground.color;
-				ctx.beginPath();
-				ctx.roundRect(backgroundRect.left, backgroundRect.top, backgroundRect.width, backgroundRect.height, radius);
-				ctx.fill();
-				ctx.fillStyle = textColor;
+					const p =
+						clamp({
+							value: resolvedBackground.cornerRadius,
+							min: CORNER_RADIUS_MIN,
+							max: CORNER_RADIUS_MAX,
+						}) / 100;
+					const radius =
+						(Math.min(backgroundRect.width, backgroundRect.height) / 2) * p;
+					ctx.fillStyle = resolvedBackground.color;
+					ctx.beginPath();
+					ctx.roundRect(
+						backgroundRect.left,
+						backgroundRect.top,
+						backgroundRect.width,
+						backgroundRect.height,
+						radius,
+					);
+					ctx.fill();
+					ctx.fillStyle = textColor;
 				}
 			}
 
@@ -248,7 +285,9 @@ export class TextNode extends BaseNode<TextNodeParams> {
 			}
 		};
 
-		const applyTransform = (ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D) => {
+		const applyTransform = (
+			ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+		) => {
 			ctx.translate(x, y);
 			ctx.scale(transform.scale, transform.scale);
 			if (transform.rotate) {
@@ -256,7 +295,8 @@ export class TextNode extends BaseNode<TextNodeParams> {
 			}
 		};
 
-		const enabledEffects = this.params.effects?.filter((effect) => effect.enabled) ?? [];
+		const enabledEffects =
+			this.params.effects?.filter((effect) => effect.enabled) ?? [];
 
 		if (enabledEffects.length === 0) {
 			renderer.context.save();
@@ -270,11 +310,16 @@ export class TextNode extends BaseNode<TextNodeParams> {
 
 		// Effects path: render text to a same-size offscreen canvas so the blur
 		// can spread into the surrounding transparent area without hard clipping.
-		const offscreen = createOffscreenCanvas({ width: renderer.width, height: renderer.height });
-		const offscreenCtx = offscreen.getContext("2d") as OffscreenCanvasRenderingContext2D | null;
+		const offscreen = createOffscreenCanvas({
+			width: renderer.width,
+			height: renderer.height,
+		});
+		const offscreenCtx = offscreen.getContext(
+			"2d",
+		) as OffscreenCanvasRenderingContext2D | null;
 
 		if (!offscreenCtx) {
-		renderer.context.save();
+			renderer.context.save();
 			applyTransform(renderer.context);
 			renderer.context.globalCompositeOperation = blendMode;
 			renderer.context.globalAlpha = opacity;

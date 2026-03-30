@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { useTransformHandles } from "@/hooks/use-transform-handles";
 import { useEditor } from "@/hooks/use-editor";
 import { isVisualElement } from "@/lib/timeline/element-utils";
@@ -47,7 +48,11 @@ export function getCornerPosition({
 	};
 }
 
-export function getRotationHandlePosition({ bounds }: { bounds: ElementBounds }): {
+export function getRotationHandlePosition({
+	bounds,
+}: {
+	bounds: ElementBounds;
+}): {
 	x: number;
 	y: number;
 } {
@@ -77,7 +82,7 @@ export function getOverlayContext({
 	return { canvasRect, containerRect };
 }
 
-export function TransformHandles({
+export const TransformHandles = memo(function TransformHandles({
 	canvasRef,
 	containerRef,
 }: {
@@ -173,7 +178,7 @@ export function TransformHandles({
 			/>
 		</div>
 	);
-}
+});
 
 function BoundingBoxOutline({
 	center,

@@ -20,7 +20,10 @@ import {
 	enforceMainTrackStart,
 	isMainTrack,
 } from "@/lib/timeline/track-utils";
-import { rippleShiftElements, closeGapsOnTrack } from "@/lib/timeline/ripple-utils";
+import {
+	rippleShiftElements,
+	closeGapsOnTrack,
+} from "@/lib/timeline/ripple-utils";
 import type { MediaAsset } from "@/types/assets";
 import { TIMELINE_CONSTANTS } from "@/constants/timeline-constants";
 
@@ -236,8 +239,8 @@ export class InsertElementCommand extends Command {
 					}) as typeof track.elements;
 
 					if (isMainTrack(track)) {
-						newElements = closeGapsOnTrack({ 
-							elements: [...newElements, adjustedElement] 
+						newElements = closeGapsOnTrack({
+							elements: [...newElements, adjustedElement],
 						}) as typeof track.elements;
 						// No need to add adjustedElement later if we already did in closeGaps
 						return { ...track, elements: newElements };

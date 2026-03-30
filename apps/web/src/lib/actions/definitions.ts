@@ -154,7 +154,11 @@ export const ACTIONS = {
 
 export type TAction = keyof typeof ACTIONS;
 
-export function getActionDefinition({ action }: { action: TAction }): TActionDefinition {
+export function getActionDefinition({
+	action,
+}: {
+	action: TAction;
+}): TActionDefinition {
 	return ACTIONS[action];
 }
 

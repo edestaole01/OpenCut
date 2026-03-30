@@ -32,11 +32,15 @@ export function EditorProvider({
 				} catch (err) {
 					console.error("Failed to load project in provider:", err);
 					if (isMounted) {
-						setError(err instanceof Error ? err.message : "Não foi possível carregar o projeto");
+						setError(
+							err instanceof Error
+								? err.message
+								: "Não foi possível carregar o projeto",
+						);
 					}
 				}
 			}
-			
+
 			if (isMounted) {
 				setIsReady(true);
 			}
@@ -53,7 +57,9 @@ export function EditorProvider({
 		return (
 			<div className="flex h-screen w-screen flex-col items-center justify-center bg-background gap-4 px-10 text-center">
 				<div className="flex flex-col gap-2">
-					<h2 className="text-xl font-bold text-foreground">Ops! Algo deu errado.</h2>
+					<h2 className="text-xl font-bold text-foreground">
+						Ops! Algo deu errado.
+					</h2>
 					<p className="text-sm text-muted-foreground">{error}</p>
 				</div>
 				<Button onClick={() => router.push("/dashboard")} className="gap-2">
@@ -69,16 +75,16 @@ export function EditorProvider({
 			<div className="flex h-screen w-screen items-center justify-center bg-background">
 				<div className="flex flex-col items-center gap-3">
 					<div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-					<p className="text-sm text-muted-foreground animate-pulse">Carregando editor...</p>
+					<p className="text-sm text-muted-foreground animate-pulse">
+						Carregando editor...
+					</p>
 				</div>
 			</div>
 		);
 	}
 
 	return (
-		<EditorContext.Provider value={editor}>
-			{children}
-		</EditorContext.Provider>
+		<EditorContext.Provider value={editor}>{children}</EditorContext.Provider>
 	);
 }
 

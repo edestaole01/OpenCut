@@ -349,15 +349,17 @@ export function useEditorActions() {
 				return;
 			}
 
-			const toastId = toast.loading("Analisando áudio e removendo silêncios...");
-			
+			const toastId = toast.loading(
+				"Analisando áudio e removendo silêncios...",
+			);
+
 			try {
 				const editorElements = editor.timeline.getElementsWithTracks({
 					elements: selectedElements,
 				});
 
 				const mediaAssets = editor.media.getAssets();
-				const mediaMap = new Map(mediaAssets.map(a => [a.id, a]));
+				const mediaMap = new Map(mediaAssets.map((a) => [a.id, a]));
 				const audioContext = createAudioContext();
 
 				for (const { element, track } of editorElements) {
@@ -371,10 +373,13 @@ export function useEditorActions() {
 
 					// 2. Decodificar o áudio completo do arquivo
 					const arrayBuffer = await asset.file.arrayBuffer();
-					const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
+					const audioBuffer = await audioContext.decodeAudioData(
+						arrayBuffer.slice(0),
+					);
 
 					// 3. Detectar segmentos de fala
-					const { speechSegments } = await detectSilenceFromAudioBuffer(audioBuffer);
+					const { speechSegments } =
+						await detectSilenceFromAudioBuffer(audioBuffer);
 
 					if (speechSegments.length <= 1) continue;
 
@@ -384,10 +389,10 @@ export function useEditorActions() {
 					const elementTrimEnd = elementTrimStart + elementDuration;
 
 					const activeSpeechSegments = speechSegments
-						.filter(s => s.end > elementTrimStart && s.start < elementTrimEnd)
-						.map(s => ({
+						.filter((s) => s.end > elementTrimStart && s.start < elementTrimEnd)
+						.map((s) => ({
 							start: Math.max(s.start, elementTrimStart),
-							end: Math.min(s.end, elementTrimEnd)
+							end: Math.min(s.end, elementTrimEnd),
 						}));
 
 					if (activeSpeechSegments.length <= 1) continue;

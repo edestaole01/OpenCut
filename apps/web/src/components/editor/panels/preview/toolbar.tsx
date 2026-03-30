@@ -35,7 +35,9 @@ export function PreviewToolbar({
 	const currentTime = editor.playback.getCurrentTime();
 	const totalDuration = editor.timeline.getTotalDuration();
 	const fps = editor.project.getActive().settings.fps;
-	const autoKeyframingEnabled = useTimelineStore((s) => s.autoKeyframingEnabled);
+	const autoKeyframingEnabled = useTimelineStore(
+		(s) => s.autoKeyframingEnabled,
+	);
 	const toggleAutoKeyframing = useTimelineStore((s) => s.toggleAutoKeyframing);
 
 	return (
@@ -59,7 +61,9 @@ export function PreviewToolbar({
 							Tempo atual — clique para digitar um tempo específico
 						</TooltipContent>
 					</Tooltip>
-					<span className="text-muted-foreground px-2 font-mono text-xs">/</span>
+					<span className="text-muted-foreground px-2 font-mono text-xs">
+						/
+					</span>
 					<span className="text-muted-foreground font-mono text-xs">
 						{formatTimeCode({
 							timeInSeconds: totalDuration,
@@ -77,15 +81,22 @@ export function PreviewToolbar({
 								size="icon"
 								className={cn(
 									"transition-colors",
-									autoKeyframingEnabled ? "text-red-500 bg-red-500/10 hover:bg-red-500/20 hover:text-red-600" : "text-muted-foreground"
+									autoKeyframingEnabled
+										? "text-red-500 bg-red-500/10 hover:bg-red-500/20 hover:text-red-600"
+										: "text-muted-foreground",
 								)}
 								onClick={() => toggleAutoKeyframing()}
 							>
-								<HugeiconsIcon icon={RecordIcon} className={autoKeyframingEnabled ? "fill-current" : ""} />
+								<HugeiconsIcon
+									icon={RecordIcon}
+									className={autoKeyframingEnabled ? "fill-current" : ""}
+								/>
 							</Button>
 						</TooltipTrigger>
 						<TooltipContent side="top">
-							{autoKeyframingEnabled ? "Desativar Auto-Keyframing" : "Ativar Auto-Keyframing (Modo Gravação)"}
+							{autoKeyframingEnabled
+								? "Desativar Auto-Keyframing"
+								: "Ativar Auto-Keyframing (Modo Gravação)"}
 						</TooltipContent>
 					</Tooltip>
 
@@ -117,15 +128,14 @@ export function PreviewToolbar({
 								<OcSocialIcon size={20} />
 							</Button>
 						</TooltipTrigger>
-						<TooltipContent side="bottom">TikTok / Formato vertical</TooltipContent>
+						<TooltipContent side="bottom">
+							TikTok / Formato vertical
+						</TooltipContent>
 					</Tooltip>
 					<Separator orientation="vertical" className="h-4" />
 					<Tooltip>
 						<TooltipTrigger asChild>
-							<Button
-								variant="text"
-								onClick={onToggleFullscreen}
-							>
+							<Button variant="text" onClick={onToggleFullscreen}>
 								<HugeiconsIcon icon={FullScreenIcon} />
 							</Button>
 						</TooltipTrigger>

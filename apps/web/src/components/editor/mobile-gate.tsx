@@ -58,9 +58,7 @@ export function MobileGate({ children }: MobileGateProps) {
 					</p>
 				</div>
 				<div className="flex items-center gap-3">
-					<Button onClick={handleContinue}>
-						Take a look anyway
-					</Button>
+					<Button onClick={handleContinue}>Take a look anyway</Button>
 					<Button variant="ghost" asChild>
 						<Link href="/roadmap" className="flex items-center gap-1">
 							Roadmap

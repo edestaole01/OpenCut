@@ -77,7 +77,7 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
 				cornerRadius: 2,
 				paddingX: 12,
 				paddingY: 6,
-			}
+			},
 		},
 		animations: {
 			entry: "fade",
@@ -119,4 +119,22 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
 			entry: "slide-up",
 		},
 	},
-];
+	{
+		id: "vhs-style",
+		name: "Retro VHS",
+		styles: {
+			fontSize: 52,
+			fontWeight: "black",
+			color: "#00FFFF",
+			textCase: "uppercase",
+			fontFamily: "Courier New",
+			strokeColor: "#FF00FF",
+			strokeWidth: 2,
+		},
+		animations: {
+			entry: "fade",
+			highlight: "shake",
+		},
+	},
+	];
+

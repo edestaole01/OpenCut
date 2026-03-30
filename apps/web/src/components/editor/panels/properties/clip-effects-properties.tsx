@@ -48,7 +48,13 @@ export function ClipEffectsProperties({
 		setDragIndex(index);
 	};
 
-	const handleDragOver = ({ event, index }: { event: React.DragEvent; index: number }) => {
+	const handleDragOver = ({
+		event,
+		index,
+	}: {
+		event: React.DragEvent;
+		index: number;
+	}) => {
 		event.preventDefault();
 		if (index !== dropIndex) setDropIndex(index);
 	};
@@ -90,9 +96,9 @@ export function ClipEffectsProperties({
 					<div
 						key={effect.id}
 						draggable
-					onDragStart={() => handleDragStart({ index })}
-					onDragOver={(event) => handleDragOver({ event, index })}
-					onDrop={() => handleDrop({ toIndex: index })}
+						onDragStart={() => handleDragStart({ index })}
+						onDragOver={(event) => handleDragOver({ event, index })}
+						onDrop={() => handleDrop({ toIndex: index })}
 						onDragEnd={handleDragEnd}
 						className={cn(
 							"group",
@@ -129,22 +135,24 @@ function ClipEffectSection({
 	const editor = useEditor();
 	const definition = getEffect({ effectType: effect.type });
 
-	const previewParam = ({ key }: { key: string }) => (value: number | string | boolean) => {
-		const updatedEffects = (element.effects ?? []).map((existing) =>
-			existing.id !== effect.id
-				? existing
-				: { ...existing, params: { ...existing.params, [key]: value } },
-		);
-		editor.timeline.previewElements({
-			updates: [
-				{
-					trackId,
-					elementId: element.id,
-					updates: { effects: updatedEffects },
-				},
-			],
-		});
-	};
+	const previewParam =
+		({ key }: { key: string }) =>
+		(value: number | string | boolean) => {
+			const updatedEffects = (element.effects ?? []).map((existing) =>
+				existing.id !== effect.id
+					? existing
+					: { ...existing, params: { ...existing.params, [key]: value } },
+			);
+			editor.timeline.previewElements({
+				updates: [
+					{
+						trackId,
+						elementId: element.id,
+						updates: { effects: updatedEffects },
+					},
+				],
+			});
+		};
 
 	const commitParam = () => editor.timeline.commitPreview();
 

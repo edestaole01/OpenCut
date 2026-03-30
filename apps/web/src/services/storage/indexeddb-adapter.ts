@@ -35,7 +35,22 @@ export class IndexedDBAdapter<T> implements StorageAdapter<T> {
 		return new Promise((resolve, reject) => {
 			const request = store.get(key);
 			request.onerror = () => reject(request.error);
-			request.onsuccess = () => resolve(request.result || null);
+			request.onsuccess = () => {
+				const result = request.result;
+				if (!result) {
+					resolve(null);
+					return;
+				}
+				if (
+					typeof result === "object" &&
+					result !== null &&
+					"value" in result
+				) {
+					resolve((result as { value: T }).value);
+					return;
+				}
+				resolve(result as T);
+			};
 		});
 	}
 
@@ -43,9 +58,15 @@ export class IndexedDBAdapter<T> implements StorageAdapter<T> {
 		const db = await this.getDB();
 		const transaction = db.transaction([this.storeName], "readwrite");
 		const store = transaction.objectStore(this.storeName);
+		const payload =
+			value instanceof Blob
+				? { id: key, value }
+				: typeof value === "object" && value !== null
+					? { id: key, ...(value as Record<string, unknown>) }
+					: { id: key, value };
 
 		return new Promise((resolve, reject) => {
-			const request = store.put({ id: key, ...value });
+			const request = store.put(payload);
 			request.onerror = () => reject(request.error);
 			request.onsuccess = () => resolve();
 		});

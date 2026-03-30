@@ -85,7 +85,11 @@ function ContentSection({
 	});
 
 	return (
-		<Section collapsible sectionKey="text:content" showTopBorder={false}>
+		<Section
+			collapsible
+			sectionKey={`text:${element.id}:content`}
+			showTopBorder={false}
+		>
 			<SectionHeader>
 				<SectionTitle>Content</SectionTitle>
 			</SectionHeader>
@@ -150,12 +154,50 @@ function TypographySection({
 	});
 
 	return (
-		<Section collapsible sectionKey="text:typography">
+		<Section collapsible sectionKey={`text:${element.id}:typography`}>
 			<SectionHeader>
 				<SectionTitle>Typography</SectionTitle>
 			</SectionHeader>
 			<SectionContent>
 				<SectionFields>
+					<SectionField label="Case">
+						<div className="flex gap-1">
+							{(
+								[
+									{ value: "none", label: "Aa", title: "Original" },
+									{ value: "uppercase", label: "AA", title: "MAIÚSCULO" },
+									{ value: "lowercase", label: "aa", title: "minúsculo" },
+									{ value: "capitalize", label: "Ab", title: "Primeira Letra" },
+									{ value: "sentence", label: "A.", title: "Início de Frase" },
+								] as const
+							).map(({ value, label, title }) => (
+								<Button
+									key={value}
+									variant={
+										(element.textTransform ?? "none") === value
+											? "default"
+											: "outline"
+									}
+									size="sm"
+									className="flex-1 h-7 px-0 text-xs font-mono"
+									title={title}
+									onClick={() =>
+										editor.timeline.updateElements({
+											updates: [
+												{
+													trackId,
+													elementId: element.id,
+													updates: { textTransform: value },
+												},
+											],
+										})
+									}
+								>
+									{label}
+								</Button>
+							))}
+						</div>
+					</SectionField>
 					<SectionField label="Font">
 						<FontPicker
 							defaultValue={element.fontFamily}
@@ -266,7 +308,11 @@ function SpacingSection({
 	});
 
 	return (
-		<Section collapsible sectionKey="text:spacing" showBottomBorder={false}>
+		<Section
+			collapsible
+			sectionKey={`text:${element.id}:spacing`}
+			showBottomBorder={false}
+		>
 			<SectionHeader>
 				<SectionTitle>Spacing</SectionTitle>
 			</SectionHeader>
@@ -479,7 +525,11 @@ function BackgroundSection({
 		parse: (input) => {
 			const parsed = parseFloat(input);
 			if (Number.isNaN(parsed)) return null;
-			return clamp({ value: Math.round(parsed), min: CORNER_RADIUS_MIN, max: CORNER_RADIUS_MAX });
+			return clamp({
+				value: Math.round(parsed),
+				min: CORNER_RADIUS_MIN,
+				max: CORNER_RADIUS_MAX,
+			});
 		},
 		valueAtPlayhead: resolvedCornerRadius,
 		buildBaseUpdates: ({ value }) => ({
@@ -514,7 +564,7 @@ function BackgroundSection({
 		<Section
 			collapsible
 			defaultOpen={element.background.enabled}
-			sectionKey="text:background"
+			sectionKey={`text:${element.id}:background`}
 		>
 			<SectionHeader
 				trailing={
@@ -590,7 +640,11 @@ function BackgroundSection({
 								onBlur={paddingX.onBlur}
 								onScrub={paddingX.scrubTo}
 								onScrubEnd={paddingX.commitScrub}
-								onReset={() => paddingX.commitValue({ value: DEFAULT_TEXT_BACKGROUND.paddingX })}
+								onReset={() =>
+									paddingX.commitValue({
+										value: DEFAULT_TEXT_BACKGROUND.paddingX,
+									})
+								}
 								isDefault={isPropertyAtDefault({
 									hasAnimatedKeyframes: paddingX.hasAnimatedKeyframes,
 									isPlayheadWithinElementRange,
@@ -621,7 +675,11 @@ function BackgroundSection({
 								onBlur={paddingY.onBlur}
 								onScrub={paddingY.scrubTo}
 								onScrubEnd={paddingY.commitScrub}
-								onReset={() => paddingY.commitValue({ value: DEFAULT_TEXT_BACKGROUND.paddingY })}
+								onReset={() =>
+									paddingY.commitValue({
+										value: DEFAULT_TEXT_BACKGROUND.paddingY,
+									})
+								}
 								isDefault={isPropertyAtDefault({
 									hasAnimatedKeyframes: paddingY.hasAnimatedKeyframes,
 									isPlayheadWithinElementRange,
@@ -653,7 +711,11 @@ function BackgroundSection({
 								onBlur={offsetX.onBlur}
 								onScrub={offsetX.scrubTo}
 								onScrubEnd={offsetX.commitScrub}
-								onReset={() => offsetX.commitValue({ value: DEFAULT_TEXT_BACKGROUND.offsetX })}
+								onReset={() =>
+									offsetX.commitValue({
+										value: DEFAULT_TEXT_BACKGROUND.offsetX,
+									})
+								}
 								isDefault={isPropertyAtDefault({
 									hasAnimatedKeyframes: offsetX.hasAnimatedKeyframes,
 									isPlayheadWithinElementRange,
@@ -683,7 +745,11 @@ function BackgroundSection({
 								onBlur={offsetY.onBlur}
 								onScrub={offsetY.scrubTo}
 								onScrubEnd={offsetY.commitScrub}
-								onReset={() => offsetY.commitValue({ value: DEFAULT_TEXT_BACKGROUND.offsetY })}
+								onReset={() =>
+									offsetY.commitValue({
+										value: DEFAULT_TEXT_BACKGROUND.offsetY,
+									})
+								}
 								isDefault={isPropertyAtDefault({
 									hasAnimatedKeyframes: offsetY.hasAnimatedKeyframes,
 									isPlayheadWithinElementRange,
@@ -715,7 +781,9 @@ function BackgroundSection({
 							onBlur={cornerRadius.onBlur}
 							onScrub={cornerRadius.scrubTo}
 							onScrubEnd={cornerRadius.commitScrub}
-							onReset={() => cornerRadius.commitValue({ value: CORNER_RADIUS_MIN })}
+							onReset={() =>
+								cornerRadius.commitValue({ value: CORNER_RADIUS_MIN })
+							}
 							isDefault={isPropertyAtDefault({
 								hasAnimatedKeyframes: cornerRadius.hasAnimatedKeyframes,
 								isPlayheadWithinElementRange,

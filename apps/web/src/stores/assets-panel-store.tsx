@@ -17,16 +17,20 @@ import {
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 
 export const TAB_KEYS = [
+	// Conteúdo
 	"media",
 	"stock",
-	"sounds",
+	// Criação
 	"text",
-	"stickers",
-	"effects",
-	"transitions",
 	"captions",
+	"stickers",
+	"sounds",
+	// Pós-produção
+	"effects",
 	"filters",
 	"adjustment",
+	"transitions",
+	// Sistema
 	"settings",
 ] as const;
 

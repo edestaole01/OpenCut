@@ -1,6 +1,9 @@
 import { EditorCore } from "@/core";
 import { Command } from "@/lib/commands/base-command";
-import { supportsAnimationProperty, upsertElementKeyframe } from "@/lib/animation";
+import {
+	supportsAnimationProperty,
+	upsertElementKeyframe,
+} from "@/lib/animation";
 import { updateElementInTracks } from "@/lib/timeline";
 import type { TimelineTrack } from "@/types/timeline";
 import type {

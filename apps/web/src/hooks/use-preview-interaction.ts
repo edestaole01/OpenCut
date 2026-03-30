@@ -40,7 +40,9 @@ export function usePreviewInteraction({
 }) {
 	const editor = useEditor();
 	const isShiftHeldRef = useShiftKey();
-	const autoKeyframingEnabled = useTimelineStore((s) => s.autoKeyframingEnabled);
+	const autoKeyframingEnabled = useTimelineStore(
+		(s) => s.autoKeyframingEnabled,
+	);
 	const [isDragging, setIsDragging] = useState(false);
 	const [snapLines, setSnapLines] = useState<SnapLine[]>([]);
 	const [editingText, setEditingText] = useState<{
@@ -263,7 +265,10 @@ export function usePreviewInteraction({
 			const deltaSnappedY =
 				snappedPosition.y - firstElement.initialTransform.position.y;
 
-			dragStateRef.current.lastSnappedDelta = { x: deltaSnappedX, y: deltaSnappedY };
+			dragStateRef.current.lastSnappedDelta = {
+				x: deltaSnappedX,
+				y: deltaSnappedY,
+			};
 
 			const updates = dragStateRef.current.elements.map(
 				({ trackId, elementId, initialTransform }) => ({
@@ -287,49 +292,49 @@ export function usePreviewInteraction({
 	);
 
 	const handlePointerUp = useCallback(
-		({ clientX, clientY, currentTarget, pointerId }: React.PointerEvent) => {
-			if (!dragStateRef.current || !isDragging || !canvasRef.current) return;
+		({ pointerId }: React.PointerEvent) => {
+		if (!dragStateRef.current || !isDragging || !canvasRef.current) return;
 
-			const deltaX = dragStateRef.current.lastSnappedDelta?.x ?? 0;
-			const deltaY = dragStateRef.current.lastSnappedDelta?.y ?? 0;
+		const deltaX = dragStateRef.current.lastSnappedDelta?.x ?? 0;
+		const deltaY = dragStateRef.current.lastSnappedDelta?.y ?? 0;
 
-			const hasMovement = Math.abs(deltaX) > 0 || Math.abs(deltaY) > 0;
+		const hasMovement = Math.abs(deltaX) > 0 || Math.abs(deltaY) > 0;
 
-			if (!hasMovement) {
+		if (!hasMovement) {
+			editor.timeline.discardPreview();
+		} else {
+			if (autoKeyframingEnabled) {
+				const currentTime = editor.playback.getCurrentTime();
+				const keyframes = dragStateRef.current.elements.flatMap(
+					({ trackId, elementId, initialTransform }) => [
+						{
+							trackId,
+							elementId,
+							propertyPath: "transform.position.x",
+							time: currentTime,
+							value: initialTransform.position.x + deltaX,
+						},
+						{
+							trackId,
+							elementId,
+							propertyPath: "transform.position.y",
+							time: currentTime,
+							value: initialTransform.position.y + deltaY,
+						},
+					],
+				);
+				editor.timeline.upsertKeyframes({ keyframes });
 				editor.timeline.discardPreview();
 			} else {
-				if (autoKeyframingEnabled) {
-					const currentTime = editor.playback.getCurrentTime();
-					const keyframes = dragStateRef.current.elements.flatMap(
-						({ trackId, elementId, initialTransform }) => [
-							{
-								trackId,
-								elementId,
-								propertyPath: "transform.position.x" as any,
-								time: currentTime,
-								value: initialTransform.position.x + deltaX,
-							},
-							{
-								trackId,
-								elementId,
-								propertyPath: "transform.position.y" as any,
-								time: currentTime,
-								value: initialTransform.position.y + deltaY,
-							},
-						],
-					);
-					editor.timeline.upsertKeyframes({ keyframes });
-					editor.timeline.discardPreview();
-				} else {
-					editor.timeline.commitPreview();
-				}
+				editor.timeline.commitPreview();
 			}
+		}
 
-			dragStateRef.current = null;
-			setIsDragging(false);
-			setSnapLines([]);
-			currentTarget.releasePointerCapture(pointerId);
-		},
+		dragStateRef.current = null;
+		setIsDragging(false);
+		setSnapLines([]);
+		canvasRef.current.releasePointerCapture(pointerId);
+	},
 		[isDragging, canvasRef, editor, autoKeyframingEnabled],
 	);
 

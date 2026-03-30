@@ -4,7 +4,10 @@ import {
 	hasKeyframesForPath,
 	upsertElementKeyframe,
 } from "@/lib/animation";
-import type { AnimationPropertyPath, ElementAnimations } from "@/types/animation";
+import type {
+	AnimationPropertyPath,
+	ElementAnimations,
+} from "@/types/animation";
 import type { TimelineElement } from "@/types/timeline";
 import { usePropertyDraft } from "./use-property-draft";
 
@@ -33,7 +36,10 @@ export function useKeyframedNumberProperty({
 }) {
 	const editor = useEditor();
 
-	const hasAnimatedKeyframes = hasKeyframesForPath({ animations, propertyPath });
+	const hasAnimatedKeyframes = hasKeyframesForPath({
+		animations,
+		propertyPath,
+	});
 	const keyframeAtTime = isPlayheadWithinElementRange
 		? getKeyframeAtTime({ animations, propertyPath, time: localTime })
 		: null;

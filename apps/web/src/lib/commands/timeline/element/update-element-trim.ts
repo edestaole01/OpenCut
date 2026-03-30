@@ -68,7 +68,9 @@ export class UpdateElementTrimCommand extends Command {
 
 			if (this.rippleEnabled && Math.abs(shiftAmount) > 0) {
 				const shiftedOthers = rippleShiftElements({
-					elements: track.elements.filter((element) => element.id !== this.elementId),
+					elements: track.elements.filter(
+						(element) => element.id !== this.elementId,
+					),
 					afterTime: oldEndTime,
 					shiftAmount,
 				});
@@ -77,7 +79,8 @@ export class UpdateElementTrimCommand extends Command {
 					elements: track.elements.map((element) =>
 						element.id === this.elementId
 							? updatedElement
-							: (shiftedOthers.find((shifted) => shifted.id === element.id) ?? element)
+							: (shiftedOthers.find((shifted) => shifted.id === element.id) ??
+								element),
 					),
 				} as typeof track;
 			}
@@ -85,7 +88,7 @@ export class UpdateElementTrimCommand extends Command {
 			return {
 				...track,
 				elements: track.elements.map((element) =>
-					element.id === this.elementId ? updatedElement : element
+					element.id === this.elementId ? updatedElement : element,
 				),
 			} as typeof track;
 		});

@@ -1,5 +1,8 @@
 import { EditorCore } from "@/core";
-import { retimeElementKeyframe, supportsAnimationProperty } from "@/lib/animation";
+import {
+	retimeElementKeyframe,
+	supportsAnimationProperty,
+} from "@/lib/animation";
 import { Command } from "@/lib/commands/base-command";
 import { updateElementInTracks } from "@/lib/timeline";
 import type { AnimationPropertyPath } from "@/types/animation";
@@ -48,7 +51,10 @@ export class RetimeKeyframeCommand extends Command {
 					propertyPath: this.propertyPath,
 				}),
 			update: (element) => {
-				const boundedTime = Math.max(0, Math.min(this.nextTime, element.duration));
+				const boundedTime = Math.max(
+					0,
+					Math.min(this.nextTime, element.duration),
+				);
 				if (!Number.isFinite(boundedTime)) return element;
 				return {
 					...element,

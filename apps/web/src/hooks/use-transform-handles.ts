@@ -219,9 +219,9 @@ export function useTransformHandles({
 				clientY: event.clientY,
 				canvas: canvasRef.current,
 			});
-		const deltaX = position.x - bounds.cx;
-		const deltaY = position.y - bounds.cy;
-		const initialAngle = (Math.atan2(deltaY, deltaX) * 180) / Math.PI;
+			const deltaX = position.x - bounds.cx;
+			const deltaY = position.y - bounds.cy;
+			const initialAngle = (Math.atan2(deltaY, deltaX) * 180) / Math.PI;
 
 			rotationStateRef.current = {
 				trackId,
@@ -266,9 +266,10 @@ export function useTransformHandles({
 					animationsWithoutScale,
 				} = scaleStateRef.current;
 
-			const deltaX = position.x - initialBoundsCx;
-			const deltaY = position.y - initialBoundsCy;
-			const currentDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY) || 1;
+				const deltaX = position.x - initialBoundsCx;
+				const deltaY = position.y - initialBoundsCy;
+				const currentDistance =
+					Math.sqrt(deltaX * deltaX + deltaY * deltaY) || 1;
 				const scaleFactor = currentDistance / initialDistance;
 				const proposedScale = Math.max(
 					MIN_SCALE,
@@ -334,9 +335,9 @@ export function useTransformHandles({
 					initialBoundsCy,
 				} = rotationStateRef.current;
 
-			const deltaX = position.x - initialBoundsCx;
-			const deltaY = position.y - initialBoundsCy;
-			const currentAngle = (Math.atan2(deltaY, deltaX) * 180) / Math.PI;
+				const deltaX = position.x - initialBoundsCx;
+				const deltaY = position.y - initialBoundsCy;
+				const currentAngle = (Math.atan2(deltaY, deltaX) * 180) / Math.PI;
 				let deltaAngle = currentAngle - initialAngle;
 				if (deltaAngle > 180) deltaAngle -= 360;
 				if (deltaAngle < -180) deltaAngle += 360;

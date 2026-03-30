@@ -16,7 +16,8 @@ export function PreviewContextMenu({
 	containerRef: React.RefObject<HTMLElement | null>;
 }) {
 	const editor = useEditor();
-	const { overlays, setOverlayVisibility } = usePreviewStore();
+	const bookmarks = usePreviewStore((s) => s.overlays.bookmarks);
+	const setOverlayVisibility = usePreviewStore((s) => s.setOverlayVisibility);
 
 	return (
 		<ContextMenuContent className="w-56" container={containerRef.current}>
@@ -27,7 +28,7 @@ export function PreviewContextMenu({
 				Save snapshot
 			</ContextMenuItem>
 			<ContextMenuCheckboxItem
-				checked={overlays.bookmarks}
+				checked={bookmarks}
 				onCheckedChange={(checked) =>
 					setOverlayVisibility({ overlay: "bookmarks", isVisible: !!checked })
 				}

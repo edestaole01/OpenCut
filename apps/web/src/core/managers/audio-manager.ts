@@ -101,9 +101,10 @@ export class AudioManager {
 	};
 
 	private handleTimelineChange = (): void => {
+		const isPlaying = this.editor.playback.getIsPlaying();
+		this.stopPlayback();
 		this.disposeSinks();
-
-		if (!this.editor.playback.getIsPlaying()) return;
+		if (!isPlaying) return;
 
 		void this.startPlayback({ time: this.editor.playback.getCurrentTime() });
 	};
@@ -136,7 +137,7 @@ export class AudioManager {
 		if (!audioContext) return;
 
 		this.stopPlayback();
-		this.playbackSessionId++;
+		const sessionId = ++this.playbackSessionId;
 		this.playbackLatencyCompensationSeconds = 0;
 
 		const tracks = this.editor.timeline.getTracks();
@@ -147,9 +148,11 @@ export class AudioManager {
 
 		if (audioContext.state === "suspended") {
 			await audioContext.resume();
+			if (sessionId !== this.playbackSessionId) return;
 		}
 
 		this.clips = await collectAudioClips({ tracks, mediaAssets });
+		if (sessionId !== this.playbackSessionId) return;
 		if (!this.editor.playback.getIsPlaying()) return;
 
 		this.playbackStartTime = time;
@@ -159,6 +162,7 @@ export class AudioManager {
 
 		if (typeof window !== "undefined") {
 			this.scheduleTimer = window.setInterval(() => {
+				if (sessionId !== this.playbackSessionId) return;
 				this.scheduleUpcomingClips();
 			}, this.scheduleIntervalMs);
 		}
@@ -183,6 +187,10 @@ export class AudioManager {
 				clip,
 				startTime: currentTime,
 				sessionId: this.playbackSessionId,
+			}).catch((error) => {
+				if (!this.isInputDisposedError(error)) {
+					console.warn("Audio iterator failed:", error);
+				}
 			});
 		}
 	}
@@ -194,7 +202,7 @@ export class AudioManager {
 		this.scheduleTimer = null;
 
 		for (const iterator of this.clipIterators.values()) {
-			void iterator.return();
+			void iterator.return().catch(() => {});
 		}
 		this.clipIterators.clear();
 		this.activeClipIds.clear();
@@ -238,110 +246,133 @@ export class AudioManager {
 		const sourceStartTime =
 			clip.trimStart + (iteratorStartTime - clip.startTime);
 
-		const iterator = sink.buffers(sourceStartTime);
-		this.clipIterators.set(clip.id, iterator);
-		let consecutiveDroppedBufferCount = 0;
+		try {
+			const iterator = sink.buffers(sourceStartTime);
+			this.clipIterators.set(clip.id, iterator);
+			let consecutiveDroppedBufferCount = 0;
 
-		for await (const { buffer, timestamp } of iterator) {
-			if (!this.editor.playback.getIsPlaying()) return;
-			if (sessionId !== this.playbackSessionId) return;
+			for await (const { buffer, timestamp } of iterator) {
+				if (!this.editor.playback.getIsPlaying()) return;
+				if (sessionId !== this.playbackSessionId) return;
 
-			const timelineTime = clip.startTime + (timestamp - clip.trimStart);
-			if (timelineTime >= clipEnd) break;
+				const timelineTime = clip.startTime + (timestamp - clip.trimStart);
+				if (timelineTime >= clipEnd) break;
 
-			const node = audioContext.createBufferSource();
-			node.buffer = buffer;
+				const node = audioContext.createBufferSource();
+				node.buffer = buffer;
 
-			const gainNode = audioContext.createGain();
-			const baseVolume = clip.volume ?? 1;
-			const fadeIn = clip.fadeIn ?? 0;
-			const fadeOut = clip.fadeOut ?? 0;
+				const gainNode = audioContext.createGain();
+				const baseVolume = clip.volume ?? 1;
+				const fadeIn = clip.fadeIn ?? 0;
+				const fadeOut = clip.fadeOut ?? 0;
+				const safeFadeIn = Number.isFinite(fadeIn) && fadeIn > 0 ? fadeIn : 0;
+				const safeFadeOut =
+					Number.isFinite(fadeOut) && fadeOut > 0 ? fadeOut : 0;
 
-			const localTime = timestamp - clip.trimStart;
-			const bufferDuration = buffer.duration;
+				const localTime = timestamp - clip.trimStart;
+				const bufferDuration = buffer.duration;
 
-			const getGainAtTime = (time: number) => {
-				let multiplier = 1;
-				if (time < fadeIn) {
-					multiplier = time / fadeIn;
-				} else if (time > clip.duration - fadeOut) {
-					multiplier = Math.max(0, (clip.duration - time) / fadeOut);
-				}
-				return baseVolume * multiplier;
-			};
-
-			const startGain = getGainAtTime(localTime);
-			const endGain = getGainAtTime(localTime + bufferDuration);
-
-			const startTimestamp =
-				this.playbackStartContextTime +
-				this.playbackLatencyCompensationSeconds +
-				(timelineTime - this.playbackStartTime);
-
-			if (startTimestamp >= audioContext.currentTime) {
-				gainNode.gain.setValueAtTime(startGain, startTimestamp);
-				gainNode.gain.linearRampToValueAtTime(
-					endGain,
-					startTimestamp + bufferDuration,
-				);
-				node.start(startTimestamp);
-				consecutiveDroppedBufferCount = 0;
-			} else {
-				const offset = audioContext.currentTime - startTimestamp;
-				if (offset < bufferDuration) {
-					const currentGain = getGainAtTime(localTime + offset);
-					gainNode.gain.setValueAtTime(currentGain, audioContext.currentTime);
-					gainNode.gain.linearRampToValueAtTime(
-						endGain,
-						startTimestamp + bufferDuration,
-					);
-					node.start(audioContext.currentTime, offset);
-					consecutiveDroppedBufferCount = 0;
-				} else {
-					consecutiveDroppedBufferCount += 1;
-					if (consecutiveDroppedBufferCount >= 5) {
-						const nextCompensationSeconds = Math.max(
-							this.playbackLatencyCompensationSeconds,
-							Math.min(0.25, offset + 0.01),
-						);
-						if (
-							nextCompensationSeconds >
-							this.playbackLatencyCompensationSeconds + 0.001
-						) {
-							this.playbackLatencyCompensationSeconds =
-								nextCompensationSeconds;
-						}
-						const resyncStartTime = this.getPlaybackTime();
-						this.clipIterators.delete(clip.id);
-						void this.runClipIterator({
-							clip,
-							startTime: resyncStartTime,
-							sessionId,
-						});
-						return;
+				const getGainAtTime = (time: number) => {
+					let multiplier = 1;
+					if (safeFadeIn > 0 && time < safeFadeIn) {
+						multiplier = time / safeFadeIn;
+					} else if (safeFadeOut > 0 && time > clip.duration - safeFadeOut) {
+						multiplier = Math.max(0, (clip.duration - time) / safeFadeOut);
 					}
+					const gainValue = baseVolume * multiplier;
+					return Number.isFinite(gainValue) ? gainValue : baseVolume;
+				};
+
+				const startGain = getGainAtTime(localTime);
+				const endGain = getGainAtTime(localTime + bufferDuration);
+
+				const startTimestamp =
+					this.playbackStartContextTime +
+					this.playbackLatencyCompensationSeconds +
+					(timelineTime - this.playbackStartTime);
+				const endTimestamp = startTimestamp + bufferDuration;
+				const hasFiniteEnvelope =
+					Number.isFinite(startGain) &&
+					Number.isFinite(endGain) &&
+					Number.isFinite(startTimestamp) &&
+					Number.isFinite(endTimestamp) &&
+					Number.isFinite(bufferDuration) &&
+					bufferDuration > 0;
+
+				if (!hasFiniteEnvelope) {
 					continue;
 				}
+
+				if (startTimestamp >= audioContext.currentTime) {
+					gainNode.gain.setValueAtTime(startGain, startTimestamp);
+					gainNode.gain.linearRampToValueAtTime(endGain, endTimestamp);
+					node.start(startTimestamp);
+					consecutiveDroppedBufferCount = 0;
+				} else {
+					const offset = audioContext.currentTime - startTimestamp;
+					if (offset < bufferDuration) {
+						const currentGain = getGainAtTime(localTime + offset);
+						gainNode.gain.setValueAtTime(currentGain, audioContext.currentTime);
+						gainNode.gain.linearRampToValueAtTime(endGain, endTimestamp);
+						node.start(audioContext.currentTime, offset);
+						consecutiveDroppedBufferCount = 0;
+					} else {
+						consecutiveDroppedBufferCount += 1;
+						if (consecutiveDroppedBufferCount >= 5) {
+							const nextCompensationSeconds = Math.max(
+								this.playbackLatencyCompensationSeconds,
+								Math.min(0.25, offset + 0.01),
+							);
+							if (
+								nextCompensationSeconds >
+								this.playbackLatencyCompensationSeconds + 0.001
+							) {
+								this.playbackLatencyCompensationSeconds =
+									nextCompensationSeconds;
+							}
+							const resyncStartTime = this.getPlaybackTime();
+							this.clipIterators.delete(clip.id);
+							void this.runClipIterator({
+								clip,
+								startTime: resyncStartTime,
+								sessionId,
+							}).catch((error) => {
+								if (!this.isInputDisposedError(error)) {
+									console.warn("Audio iterator failed:", error);
+								}
+							});
+							return;
+						}
+						continue;
+					}
+				}
+
+				node.connect(gainNode);
+				gainNode.connect(this.masterGain ?? audioContext.destination);
+
+				this.queuedSources.add(node);
+				node.addEventListener("ended", () => {
+					node.disconnect();
+					gainNode.disconnect();
+					this.queuedSources.delete(node);
+				});
+
+				const aheadTime = timelineTime - this.getPlaybackTime();
+				if (aheadTime >= 1) {
+					await this.waitUntilCaughtUp({ timelineTime, targetAhead: 1 });
+					if (sessionId !== this.playbackSessionId) return;
+				}
 			}
-
-			node.connect(gainNode);
-			gainNode.connect(this.masterGain ?? audioContext.destination);
-
-			this.queuedSources.add(node);
-			node.addEventListener("ended", () => {
-				node.disconnect();
-				gainNode.disconnect();
-				this.queuedSources.delete(node);
-			});
-
-			const aheadTime = timelineTime - this.getPlaybackTime();
-			if (aheadTime >= 1) {
-				await this.waitUntilCaughtUp({ timelineTime, targetAhead: 1 });
-				if (sessionId !== this.playbackSessionId) return;
+		} catch (error) {
+			if (sessionId !== this.playbackSessionId) {
+				return;
 			}
+			if (!this.isInputDisposedError(error)) {
+				console.warn("Audio iterator failed:", error);
+			}
+		} finally {
+			this.clipIterators.delete(clip.id);
 		}
-
-		this.clipIterators.delete(clip.id);
 		// don't remove from activeClipIds - prevents scheduler from restarting this clip
 		// the set is cleared on stopPlayback anyway
 	}
@@ -372,7 +403,7 @@ export class AudioManager {
 
 	private disposeSinks(): void {
 		for (const iterator of this.clipIterators.values()) {
-			void iterator.return();
+			void iterator.return().catch(() => {});
 		}
 		this.clipIterators.clear();
 		this.activeClipIds.clear();
@@ -411,5 +442,15 @@ export class AudioManager {
 			console.warn("Failed to initialize audio sink:", error);
 			return null;
 		}
+	}
+
+	private isInputDisposedError(error: unknown): boolean {
+		if (!(error instanceof Error)) {
+			return false;
+		}
+		return (
+			error.name === "InputDisposedError" ||
+			error.message.includes("Input has been disposed")
+		);
 	}
 }

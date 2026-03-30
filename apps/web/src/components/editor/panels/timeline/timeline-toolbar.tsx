@@ -6,7 +6,7 @@ import {
 	TooltipContent,
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { SplitSquareHorizontal, } from "lucide-react";
+import { SplitSquareHorizontal } from "lucide-react";
 import {
 	SplitButton,
 	SplitButtonLeft,
@@ -59,7 +59,7 @@ export function TimelineToolbar({
 
 	return (
 		<ScrollArea className="scrollbar-hidden">
-			<div className="flex h-10 items-center justify-between border-b px-2 py-1">
+			<div className="flex h-11 items-center justify-between border-b px-3 py-1.5 bg-background/50">
 				<ToolbarLeftSection />
 
 				<SceneSelector />
@@ -78,7 +78,9 @@ export function TimelineToolbar({
 function ToolbarLeftSection() {
 	const editor = useEditor();
 	const currentTime = editor.playback.getCurrentTime();
-	const isCurrentlyBookmarked = editor.scenes.isBookmarked({ time: currentTime });
+	const isCurrentlyBookmarked = editor.scenes.isBookmarked({
+		time: currentTime,
+	});
 
 	const handleAction = ({
 		action,
@@ -92,20 +94,19 @@ function ToolbarLeftSection() {
 	};
 
 	return (
-		<div className="flex items-center gap-1">
+		<div className="flex items-center gap-0.5">
 			<TooltipProvider delayDuration={500}>
+				{/* Grupo: Corte */}
 				<ToolbarButton
 					icon={<HugeiconsIcon icon={ScissorIcon} />}
 					tooltip="Cortar clip aqui (S)"
 					onClick={({ event }) => handleAction({ action: "split", event })}
 				/>
-
 				<ToolbarButton
 					icon={<HugeiconsIcon icon={AlignLeftIcon} />}
 					tooltip="Remover parte esquerda (Q)"
 					onClick={({ event }) => handleAction({ action: "split-left", event })}
 				/>
-
 				<ToolbarButton
 					icon={<HugeiconsIcon icon={AlignRightIcon} />}
 					tooltip="Remover parte direita (W)"
@@ -114,13 +115,9 @@ function ToolbarLeftSection() {
 					}
 				/>
 
-				<ToolbarButton
-					icon={<SplitSquareHorizontal />}
-					tooltip="Separar áudio (em breve)"
-					disabled={true}
-					onClick={({ event: _event }) => {}}
-				/>
+				<div className="bg-border mx-1.5 h-5 w-px shrink-0" />
 
+				{/* Grupo: Edição */}
 				<ToolbarButton
 					icon={<HugeiconsIcon icon={Copy01Icon} />}
 					tooltip="Duplicar elemento (Ctrl+D)"
@@ -128,14 +125,6 @@ function ToolbarLeftSection() {
 						handleAction({ action: "duplicate-selected", event })
 					}
 				/>
-
-				<ToolbarButton
-					icon={<HugeiconsIcon icon={SnowIcon} />}
-					tooltip="Congelar frame (em breve)"
-					disabled={true}
-					onClick={({ event: _event }) => {}}
-				/>
-
 				<ToolbarButton
 					icon={<HugeiconsIcon icon={Delete02Icon} />}
 					tooltip="Deletar elemento (Delete)"
@@ -144,19 +133,38 @@ function ToolbarLeftSection() {
 					}
 				/>
 
+				<div className="bg-border mx-1.5 h-5 w-px shrink-0" />
+
+				{/* Grupo: Avançado */}
+				<ToolbarButton
+					icon={<SplitSquareHorizontal />}
+					tooltip="Separar áudio (em breve)"
+					disabled={true}
+					onClick={({ event: _event }) => {}}
+				/>
+				<ToolbarButton
+					icon={<HugeiconsIcon icon={SnowIcon} />}
+					tooltip="Congelar frame (em breve)"
+					disabled={true}
+					onClick={({ event: _event }) => {}}
+				/>
 				<ToolbarButton
 					icon={<HugeiconsIcon icon={ScissorIcon} className="text-primary" />}
 					tooltip="Remover silêncios automaticamente"
-					onClick={({ event }) => handleAction({ action: "remove-silences", event })}
+					onClick={({ event }) =>
+						handleAction({ action: "remove-silences", event })
+					}
 				/>
 
-				<div className="bg-border mx-1 h-6 w-px" />
+				<div className="bg-border mx-1.5 h-5 w-px shrink-0" />
 
 				<Tooltip>
 					<ToolbarButton
 						icon={<HugeiconsIcon icon={Bookmark02Icon} />}
 						isActive={isCurrentlyBookmarked}
-						tooltip={isCurrentlyBookmarked ? "Remover marcador" : "Adicionar marcador"}
+						tooltip={
+							isCurrentlyBookmarked ? "Remover marcador" : "Adicionar marcador"
+						}
 						onClick={({ event }) =>
 							handleAction({ action: "toggle-bookmark", event })
 						}
@@ -210,21 +218,33 @@ function ToolbarRightSection({
 				<ToolbarButton
 					icon={<HugeiconsIcon icon={ScissorIcon} />}
 					isActive={isBladeModeEnabled}
-					tooltip={isBladeModeEnabled ? "Desativar ferramenta de corte (B)" : "Ativar ferramenta de corte (B)"}
+					tooltip={
+						isBladeModeEnabled
+							? "Desativar ferramenta de corte (B)"
+							: "Ativar ferramenta de corte (B)"
+					}
 					onClick={() => toggleBladeMode()}
 				/>
 
 				<ToolbarButton
 					icon={<HugeiconsIcon icon={MagnetIcon} />}
 					isActive={snappingEnabled}
-					tooltip={snappingEnabled ? "Snap ativado (N para desativar)" : "Snap desativado (N para ativar)"}
+					tooltip={
+						snappingEnabled
+							? "Snap ativado (N para desativar)"
+							: "Snap desativado (N para ativar)"
+					}
 					onClick={() => toggleSnapping()}
 				/>
 
 				<ToolbarButton
 					icon={<HugeiconsIcon icon={Link04Icon} className="scale-110" />}
 					isActive={rippleEditingEnabled}
-					tooltip={rippleEditingEnabled ? "Edição em cadeia ativada" : "Edição em cadeia desativada"}
+					tooltip={
+						rippleEditingEnabled
+							? "Edição em cadeia ativada"
+							: "Edição em cadeia desativada"
+					}
 					onClick={() => toggleRippleEditing()}
 				/>
 			</TooltipProvider>

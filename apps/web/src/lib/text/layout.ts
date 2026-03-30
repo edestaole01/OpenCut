@@ -50,10 +50,7 @@ export function measureTextBlock({
 	for (let index = 0; index < lineMetrics.length; index++) {
 		const metrics = lineMetrics[index];
 		const lineY = index * lineHeightPx;
-		top = Math.min(
-			top,
-			lineY - getMetricAscent({ metrics, fallbackFontSize }),
-		);
+		top = Math.min(top, lineY - getMetricAscent({ metrics, fallbackFontSize }));
 		bottom = Math.max(
 			bottom,
 			lineY + getMetricDescent({ metrics, fallbackFontSize }),

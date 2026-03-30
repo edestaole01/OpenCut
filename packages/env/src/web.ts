@@ -23,6 +23,8 @@ const webEnvSchema = z.object({
 	R2_SECRET_ACCESS_KEY: z.string().optional().default("placeholder"),
 	R2_BUCKET_NAME: z.string().optional().default("placeholder"),
 	MODAL_TRANSCRIPTION_URL: z.url().default("https://placeholder.example.com"),
+	PEXELS_API_KEY: z.string().optional().default(""),
+	GIPHY_API_KEY: z.string().optional().default(""),
 });
 export type WebEnv = z.infer<typeof webEnvSchema>;
 export const webEnv = webEnvSchema.parse(process.env);

@@ -6,6 +6,11 @@ export interface TranscriptionSegment {
 	text: string;
 	start: number;
 	end: number;
+	words?: Array<{
+		word: string;
+		start: number;
+		end: number;
+	}>;
 }
 
 export interface TranscriptionResult {
@@ -29,8 +34,10 @@ export interface TranscriptionProgress {
 
 export type TranscriptionModelId =
 	| "whisper-tiny"
+	| "whisper-base"
 	| "whisper-small"
 	| "whisper-medium"
+	| "whisper-large-v3"
 	| "whisper-large-v3-turbo";
 
 export interface TranscriptionModel {

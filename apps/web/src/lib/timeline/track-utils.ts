@@ -9,10 +9,7 @@ import type {
 	EffectTrack,
 	TimelineElement,
 } from "@/types/timeline";
-import {
-	TRACK_CONFIG,
-	TRACK_GAP,
-} from "@/constants/timeline-constants";
+import { TRACK_CONFIG, TRACK_GAP } from "@/constants/timeline-constants";
 import { generateUUID } from "@/utils/id";
 
 export function canTracktHaveAudio(

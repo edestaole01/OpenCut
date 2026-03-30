@@ -44,11 +44,18 @@ export function Section({
 
 	useEffect(() => {
 		if (!sectionKey) return;
-		if (process.env.NODE_ENV !== "production" && mountedSectionKeys.has(sectionKey)) {
-			console.error(`[Section] duplicate sectionKey mounted simultaneously: "${sectionKey}"`);
+		if (
+			process.env.NODE_ENV !== "production" &&
+			mountedSectionKeys.has(sectionKey)
+		) {
+			console.error(
+				`[Section] duplicate sectionKey mounted simultaneously: "${sectionKey}"`,
+			);
 		}
 		mountedSectionKeys.add(sectionKey);
-		return () => { mountedSectionKeys.delete(sectionKey); };
+		return () => {
+			mountedSectionKeys.delete(sectionKey);
+		};
 	}, [sectionKey]);
 
 	const toggle = () => {
@@ -62,8 +69,8 @@ export function Section({
 			<div
 				className={cn(
 					"flex flex-col",
-				showTopBorder && "border-t",
-				showBottomBorder && "last:border-b",
+					showTopBorder && "border-t",
+					showBottomBorder && "last:border-b",
 					className,
 				)}
 			>
@@ -101,7 +108,9 @@ export function SectionHeader({
 			icon={ArrowDownIcon}
 			className={cn(
 				"size-4 shrink-0 transition-transform duration-200 ease-out",
-				isOpen ? "rotate-0 text-foreground" : "-rotate-90 text-muted-foreground",
+				isOpen
+					? "rotate-0 text-foreground"
+					: "-rotate-90 text-muted-foreground",
 			)}
 		/>
 	) : null;
@@ -134,7 +143,9 @@ export function SectionHeader({
 
 	if (!isInteractive) {
 		return (
-			<div className={cn("flex h-11 w-full items-center gap-2 px-3.5", className)}>
+			<div
+				className={cn("flex h-11 w-full items-center gap-2 px-3.5", className)}
+			>
 				{headerContent}
 			</div>
 		);
@@ -150,7 +161,9 @@ export function SectionHeader({
 				className,
 			)}
 			onClick={handleClick}
-			onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") handleClick?.(); }}
+			onKeyDown={(event) => {
+				if (event.key === "Enter" || event.key === " ") handleClick?.();
+			}}
 		>
 			{headerContent}
 		</div>

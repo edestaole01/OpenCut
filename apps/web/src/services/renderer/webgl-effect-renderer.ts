@@ -12,6 +12,7 @@ export interface ApplyEffectParams {
 let gl: WebGLRenderingContext | null = null;
 let canvas: OffscreenCanvas | HTMLCanvasElement | null = null;
 const programCache = new Map<string, WebGLProgram>();
+let hasLoggedTaintedCanvasWarning = false;
 
 function getOrCreateCanvas({
 	width,
@@ -42,30 +43,49 @@ function applyEffect({
 	height,
 	passes,
 }: ApplyEffectParams): OffscreenCanvas | HTMLCanvasElement {
-	const targetCanvas = getOrCreateCanvas({ width, height });
-	const context = gl;
-	if (!context) {
-		throw new Error("WebGL context not initialized");
-	}
-
-	applyMultiPassEffect({
-		context,
-		source,
-		width,
-		height,
-		passes,
-		programCache,
-	});
-
 	const outputCanvas = createOffscreenCanvas({ width, height });
 	const outputCtx = outputCanvas.getContext("2d") as
 		| CanvasRenderingContext2D
 		| OffscreenCanvasRenderingContext2D
 		| null;
-	if (outputCtx) {
-		outputCtx.drawImage(targetCanvas, 0, 0, width, height);
+
+	try {
+		const targetCanvas = getOrCreateCanvas({ width, height });
+		const context = gl;
+		if (!context) {
+			throw new Error("WebGL context not initialized");
+		}
+
+		applyMultiPassEffect({
+			context,
+			source,
+			width,
+			height,
+			passes,
+			programCache,
+		});
+
+		if (outputCtx) {
+			outputCtx.drawImage(targetCanvas, 0, 0, width, height);
+		}
+		return outputCanvas;
+	} catch (error) {
+		const message =
+			error instanceof Error ? error.message : String(error ?? "unknown");
+		if (message.toLowerCase().includes("tainted canvases")) {
+			if (!hasLoggedTaintedCanvasWarning) {
+				hasLoggedTaintedCanvasWarning = true;
+				console.warn(
+					"Skipping WebGL effect for tainted source canvas. Falling back to original frame.",
+				);
+			}
+			if (outputCtx) {
+				outputCtx.drawImage(source, 0, 0, width, height);
+			}
+			return outputCanvas;
+		}
+		throw error;
 	}
-	return outputCanvas;
 }
 
 export const webglEffectRenderer = {

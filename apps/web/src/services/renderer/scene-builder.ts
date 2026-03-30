@@ -16,11 +16,7 @@ import { isMainTrack } from "@/lib/timeline";
 const PREVIEW_MAX_IMAGE_SIZE = 2048;
 const BLUR_BACKGROUND_ZOOM_SCALE = 1.4;
 
-function getVisibleSortedElements({
-	track,
-}: {
-	track: TimelineTrack;
-}) {
+function getVisibleSortedElements({ track }: { track: TimelineTrack }) {
 	return track.elements
 		.filter((element) => !("hidden" in element && element.hidden))
 		.slice()
@@ -184,13 +180,15 @@ export function buildScene({
 				),
 				effectType: "blur",
 				effectParams: {
-					intensity:
-						background.blurIntensity ?? DEFAULT_BLUR_INTENSITY,
+					intensity: background.blurIntensity ?? DEFAULT_BLUR_INTENSITY,
 				},
 				scale: BLUR_BACKGROUND_ZOOM_SCALE,
 			}),
 		);
-	} else if (background.type === "color" && background.color !== "transparent") {
+	} else if (
+		background.type === "color" &&
+		background.color !== "transparent"
+	) {
 		rootNode.add(new ColorNode({ color: background.color }));
 	}
 

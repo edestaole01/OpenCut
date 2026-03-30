@@ -59,12 +59,7 @@ function parseHexColor({
 		const green = parseHexChannel({ hex: `${greenHex}${greenHex}` });
 		const blue = parseHexChannel({ hex: `${blueHex}${blueHex}` });
 		const alpha = parseHexChannel({ hex: `${alphaHex}${alphaHex}` });
-		if (
-			red === null ||
-			green === null ||
-			blue === null ||
-			alpha === null
-		) {
+		if (red === null || green === null || blue === null || alpha === null) {
 			return null;
 		}
 
@@ -77,12 +72,7 @@ function parseHexColor({
 		const blue = parseHexChannel({ hex: rawHex.slice(4, 6) });
 		const alphaHex = rawHex.length === 8 ? rawHex.slice(6, 8) : "ff";
 		const alpha = parseHexChannel({ hex: alphaHex });
-		if (
-			red === null ||
-			green === null ||
-			blue === null ||
-			alpha === null
-		) {
+		if (red === null || green === null || blue === null || alpha === null) {
 			return null;
 		}
 
@@ -177,7 +167,10 @@ export function normalizeChannel<TChannel extends AnimationChannel>({
 	} as TChannel;
 }
 
-function evaluateChannelValueAtTime<TKeyframe extends { time: number; value: TValue }, TValue>({
+function evaluateChannelValueAtTime<
+	TKeyframe extends { time: number; value: TValue },
+	TValue,
+>({
 	keyframes,
 	time,
 	fallbackValue,
@@ -214,7 +207,11 @@ function evaluateChannelValueAtTime<TKeyframe extends { time: number; value: TVa
 		return lastKeyframe.value;
 	}
 
-	for (let keyframeIndex = 0; keyframeIndex < keyframes.length - 1; keyframeIndex++) {
+	for (
+		let keyframeIndex = 0;
+		keyframeIndex < keyframes.length - 1;
+		keyframeIndex++
+	) {
 		const leftKeyframe = keyframes[keyframeIndex];
 		const rightKeyframe = keyframes[keyframeIndex + 1];
 

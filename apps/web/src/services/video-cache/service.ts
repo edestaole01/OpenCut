@@ -12,6 +12,7 @@ interface VideoSinkData {
 	currentFrame: WrappedCanvas | null;
 	nextFrame: WrappedCanvas | null;
 	lastTime: number;
+	lastError: unknown | null;
 	prefetching: boolean;
 	prefetchPromise: Promise<void> | null;
 }
@@ -19,6 +20,7 @@ interface VideoSinkData {
 export class VideoCache {
 	private sinks = new Map<string, VideoSinkData>();
 	private initPromises = new Map<string, Promise<void>>();
+	private operationQueues = new Map<string, Promise<void>>();
 
 	async getFrameAt({
 		mediaId,
@@ -31,9 +33,46 @@ export class VideoCache {
 	}): Promise<WrappedCanvas | null> {
 		await this.ensureSink({ mediaId, file });
 
-		const sinkData = this.sinks.get(mediaId);
-		if (!sinkData) return null;
+		return this.withMediaLock({
+			mediaId,
+			operation: async () => {
+				for (let attempt = 0; attempt < 2; attempt++) {
+					const sinkData = this.sinks.get(mediaId);
+					if (!sinkData) return null;
+					sinkData.lastError = null;
 
+					const frame = await this.readFrameFromSink({ sinkData, time });
+					if (frame) {
+						return frame;
+					}
+
+					if (
+						attempt === 0 &&
+						this.isRecoverableSinkError({ error: sinkData.lastError })
+					) {
+						console.warn(
+							"Video sink entered recoverable error state. Reinitializing...",
+							sinkData.lastError,
+						);
+						await this.reinitializeSink({ mediaId, file });
+						continue;
+					}
+
+					return null;
+				}
+
+				return null;
+			},
+		});
+	}
+
+	private async readFrameFromSink({
+		sinkData,
+		time,
+	}: {
+		sinkData: VideoSinkData;
+		time: number;
+	}): Promise<WrappedCanvas | null> {
 		if (sinkData.nextFrame && sinkData.nextFrame.timestamp <= time) {
 			sinkData.currentFrame = sinkData.nextFrame;
 			sinkData.nextFrame = null;
@@ -70,6 +109,64 @@ export class VideoCache {
 			this.startPrefetch({ sinkData });
 		}
 		return frame;
+	}
+
+	private async withMediaLock<T>({
+		mediaId,
+		operation,
+	}: {
+		mediaId: string;
+		operation: () => Promise<T>;
+	}): Promise<T> {
+		const previous = this.operationQueues.get(mediaId) ?? Promise.resolve();
+		let release: () => void = () => {};
+		const current = new Promise<void>((resolve) => {
+			release = () => resolve();
+		});
+		this.operationQueues.set(
+			mediaId,
+			previous.then(
+				() => current,
+				() => current,
+			),
+		);
+
+		await previous;
+		try {
+			return await operation();
+		} finally {
+			release();
+		}
+	}
+
+	private isRecoverableSinkError({ error }: { error: unknown }): boolean {
+		if (!error) return false;
+		const message = (() => {
+			if (error instanceof Error) return error.message;
+			if (typeof error === "string") return error;
+			try {
+				return JSON.stringify(error);
+			} catch {
+				return String(error);
+			}
+		})();
+		const normalized = message.toLowerCase();
+		return (
+			normalized.includes("network error") ||
+			normalized.includes("failed to fetch") ||
+			normalized.includes("input has been disposed")
+		);
+	}
+
+	private async reinitializeSink({
+		mediaId,
+		file,
+	}: {
+		mediaId: string;
+		file: File;
+	}): Promise<void> {
+		this.clearVideo({ mediaId });
+		await this.ensureSink({ mediaId, file });
 	}
 
 	private isFrameValid({
@@ -125,6 +222,7 @@ export class VideoCache {
 			}
 		} catch (error) {
 			console.warn("Iterator failed, will restart:", error);
+			sinkData.lastError = error;
 			sinkData.iterator = null;
 		}
 
@@ -172,6 +270,8 @@ export class VideoCache {
 			}
 		} catch (error) {
 			console.warn("Failed to seek video:", error);
+			sinkData.lastError = error;
+			sinkData.iterator = null;
 		}
 
 		return null;
@@ -211,6 +311,7 @@ export class VideoCache {
 			sinkData.prefetchPromise = null;
 		} catch (error) {
 			console.warn("Prefetch failed:", error);
+			sinkData.lastError = error;
 			sinkData.prefetching = false;
 			sinkData.prefetchPromise = null;
 			sinkData.iterator = null;
@@ -273,6 +374,7 @@ export class VideoCache {
 				currentFrame: null,
 				nextFrame: null,
 				lastTime: -1,
+				lastError: null,
 				prefetching: false,
 				prefetchPromise: null,
 			});
@@ -286,13 +388,14 @@ export class VideoCache {
 		const sinkData = this.sinks.get(mediaId);
 		if (sinkData) {
 			if (sinkData.iterator) {
-				void sinkData.iterator.return();
+				void sinkData.iterator.return().catch(() => {});
 			}
 
 			this.sinks.delete(mediaId);
 		}
 
 		this.initPromises.delete(mediaId);
+		this.operationQueues.delete(mediaId);
 	}
 
 	clearAll(): void {

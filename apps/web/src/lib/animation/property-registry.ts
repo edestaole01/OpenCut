@@ -24,7 +24,11 @@ interface AnimationPropertyDefinition {
 	defaultInterpolation: AnimationInterpolation;
 	numericRange?: NumericRange;
 	supportsElement: ({ element }: { element: TimelineElement }) => boolean;
-	getValue: ({ element }: { element: TimelineElement }) => AnimationValue | null;
+	getValue: ({
+		element,
+	}: {
+		element: TimelineElement;
+	}) => AnimationValue | null;
 	setValue: ({
 		element,
 		value,
@@ -228,7 +232,10 @@ const ANIMATION_PROPERTY_REGISTRY: Record<
 			element.type === "text"
 				? {
 						...element,
-						background: { ...element.background, cornerRadius: value as number },
+						background: {
+							...element.background,
+							cornerRadius: value as number,
+						},
 					}
 				: element,
 	},

@@ -49,7 +49,8 @@ export function DraggableItem({
 	isHighlighted = false,
 }: DraggableItemProps) {
 	const [isDragging, setIsDragging] = useState(false);
-	const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
+	const dragPosition = useRef({ x: 0, y: 0 });
+	const dragGhostRef = useRef<HTMLDivElement>(null);
 	const dragRef = useRef<HTMLDivElement>(null);
 	const editor = useEditor();
 	const highlightClassName = `ring-2 ring-primary bg-primary/10 ${isRounded ? "rounded-sm" : ""}`;
@@ -66,7 +67,12 @@ export function DraggableItem({
 		if (!isDragging) return;
 
 		const handleDragOver = (e: DragEvent) => {
-			setDragPosition({ x: e.clientX, y: e.clientY });
+			dragPosition.current = { x: e.clientX, y: e.clientY };
+			// Directly update the ghost element position to avoid re-render
+			if (dragGhostRef.current) {
+				dragGhostRef.current.style.left = `${e.clientX - 40}px`;
+				dragGhostRef.current.style.top = `${e.clientY - 40}px`;
+			}
 		};
 
 		document.addEventListener("dragover", handleDragOver);
@@ -82,7 +88,7 @@ export function DraggableItem({
 		setDragData({ dataTransfer: e.dataTransfer, dragData });
 		e.dataTransfer.effectAllowed = "copy";
 
-		setDragPosition({ x: e.clientX, y: e.clientY });
+		dragPosition.current = { x: e.clientX, y: e.clientY };
 		setIsDragging(true);
 
 		onDragStart?.({ e });
@@ -177,8 +183,8 @@ export function DraggableItem({
 					<div
 						className="pointer-events-none fixed z-9999"
 						style={{
-							left: dragPosition.x - 40,
-							top: dragPosition.y - 40,
+							left: dragPosition.current.x - 40,
+							top: dragPosition.current.y - 40,
 						}}
 					>
 						<div className="w-[80px]">

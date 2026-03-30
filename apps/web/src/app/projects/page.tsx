@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { KeyboardEvent, MouseEvent } from "react";
 import { useEffect, useState } from "react";
+import { useDebounce } from "@/hooks/use-debounce";
 import { toast } from "sonner";
 import { MigrationDialog } from "@/components/editor/dialogs/migration-dialog";
 import { Button } from "@/components/ui/button";
@@ -307,7 +308,13 @@ function SearchBar({
 	className?: string;
 	collapsed?: boolean;
 }) {
-	const { searchQuery, setSearchQuery } = useProjectsStore();
+	const { setSearchQuery } = useProjectsStore();
+	const [inputValue, setInputValue] = useState("");
+	const debouncedValue = useDebounce(inputValue);
+
+	useEffect(() => {
+		setSearchQuery({ query: debouncedValue });
+	}, [debouncedValue, setSearchQuery]);
 
 	return (
 		<>
@@ -330,8 +337,8 @@ function SearchBar({
 					/>
 					<Input
 						placeholder="Search..."
-						value={searchQuery}
-						onChange={(event) => setSearchQuery({ query: event.target.value })}
+						value={inputValue}
+						onChange={(event) => setInputValue(event.target.value)}
 						size="lg"
 						className="pl-9"
 					/>

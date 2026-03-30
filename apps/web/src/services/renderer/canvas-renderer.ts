@@ -18,12 +18,14 @@ export class CanvasRenderer {
 		this.height = height;
 		this.fps = fps;
 
+		const dpr = typeof window !== "undefined" ? window.devicePixelRatio : 1;
+
 		try {
-			this.canvas = new OffscreenCanvas(width, height);
+			this.canvas = new OffscreenCanvas(width * dpr, height * dpr);
 		} catch {
 			this.canvas = document.createElement("canvas");
-			this.canvas.width = width;
-			this.canvas.height = height;
+			this.canvas.width = width * dpr;
+			this.canvas.height = height * dpr;
 		}
 
 		const context = this.canvas.getContext("2d");
@@ -34,37 +36,47 @@ export class CanvasRenderer {
 		this.context = context as
 			| OffscreenCanvasRenderingContext2D
 			| CanvasRenderingContext2D;
+
+		this.context.scale(dpr, dpr);
 	}
 
 	setSize({ width, height }: { width: number; height: number }) {
+		if (this.width === width && this.height === height) return;
+
 		this.width = width;
 		this.height = height;
+		const dpr = typeof window !== "undefined" ? window.devicePixelRatio : 1;
 
 		if (this.canvas instanceof OffscreenCanvas) {
-			this.canvas = new OffscreenCanvas(width, height);
+			this.canvas.width = width * dpr;
+			this.canvas.height = height * dpr;
 		} else {
-			this.canvas.width = width;
-			this.canvas.height = height;
+			this.canvas.width = width * dpr;
+			this.canvas.height = height * dpr;
 		}
 
-		const context = this.canvas.getContext("2d");
-		if (!context) {
-			throw new Error("Failed to get canvas context");
+		if (this.context) {
+			this.context.scale(dpr, dpr);
 		}
-		this.context = context as
-			| OffscreenCanvasRenderingContext2D
-			| CanvasRenderingContext2D;
 	}
 
 	private clear() {
 		this.context.fillStyle = "black";
-		this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
+		this.context.fillRect(0, 0, this.width, this.height);
 	}
 
 	async render({ node, time }: { node: BaseNode; time: number }) {
-		this.clear();
-		await node.render({ renderer: this, time });
+		if (
+			this.context instanceof CanvasRenderingContext2D ||
+			this.context instanceof OffscreenCanvasRenderingContext2D
+		) {
+			this.clear();
+			await node.render({ renderer: this, time });
+		}
 	}
+
+	private targetCtx: CanvasRenderingContext2D | null = null;
+	private lastTargetCanvas: HTMLCanvasElement | null = null;
 
 	async renderToCanvas({
 		node,
@@ -77,11 +89,22 @@ export class CanvasRenderer {
 	}) {
 		await this.render({ node, time });
 
-		const ctx = targetCanvas.getContext("2d");
-		if (!ctx) {
+		if (this.lastTargetCanvas !== targetCanvas) {
+			this.targetCtx = targetCanvas.getContext("2d");
+			this.lastTargetCanvas = targetCanvas;
+		}
+
+		if (!this.targetCtx) {
 			throw new Error("Failed to get target canvas context");
 		}
 
-		ctx.drawImage(this.canvas, 0, 0, targetCanvas.width, targetCanvas.height);
+		this.targetCtx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
+		this.targetCtx.drawImage(
+			this.canvas,
+			0,
+			0,
+			targetCanvas.width,
+			targetCanvas.height,
+		);
 	}
 }

@@ -185,220 +185,247 @@ interface TimelineElementProps {
 	isDropTarget?: boolean;
 }
 
-export const TimelineElement = memo(function TimelineElement({
-	element,
-	track,
-	zoomLevel,
-	isSelected,
-	onSnapPointChange,
-	onResizeStateChange,
-	onElementMouseDown,
-	onElementClick,
-	dragState,
-	isDropTarget = false,
-}: TimelineElementProps) {
-	const editor = useEditor();
-	const { selectedElements } = useElementSelection();
-	const { requestRevealMedia } = useAssetsPanelStore();
-
-	// #3 – cache assets in a Map to avoid O(n) find on every render
-	const allAssets = editor.media.getAssets();
-	const assetsMap = useMemo(() => {
-		const map = new Map<string, MediaAsset>();
-		for (const a of allAssets) map.set(a.id, a);
-		return map;
-	}, [allAssets]);
-
-	const mediaAsset: MediaAsset | null = hasMediaId(element)
-		? (assetsMap.get(element.mediaId) ?? null)
-		: null;
-
-	const hasAudio = mediaSupportsAudio({ media: mediaAsset });
-
-	const { handleResizeStart, isResizing, currentStartTime, currentDuration } =
-		useTimelineElementResize({
-			element,
-			track,
-			zoomLevel,
-			onSnapPointChange,
-			onResizeStateChange,
-		});
-
-	const isCurrentElementSelected = selectedElements.some(
-		(selected) =>
-			selected.elementId === element.id && selected.trackId === track.id,
-	);
-
-	const isBeingDragged = dragState.elementId === element.id;
-	const dragOffsetY =
-		isBeingDragged && dragState.isDragging
-			? dragState.currentMouseY - dragState.startMouseY
-			: 0;
-	const elementStartTime =
-		isBeingDragged && dragState.isDragging
-			? dragState.currentTime
-			: element.startTime;
-	const displayedStartTime = isResizing ? currentStartTime : elementStartTime;
-	const displayedDuration = isResizing ? currentDuration : element.duration;
-	const elementWidth = timelineTimeToPixels({
-		time: displayedDuration,
+export const TimelineElement = memo(
+	function TimelineElement({
+		element,
+		track,
 		zoomLevel,
-	});
-	const elementLeft = timelineTimeToSnappedPixels({
-		time: displayedStartTime,
-		zoomLevel,
-	});
-	// #4 – memoize keyframe calculation (O(n) per render without this)
-	const keyframeIndicators = useMemo(
-		() =>
-			isSelected
-				? getKeyframeIndicators({
-						keyframes: getElementKeyframes({ animations: element.animations }),
-						trackId: track.id,
-						elementId: element.id,
-						displayedStartTime,
-						zoomLevel,
-						elementLeft,
-						elementWidth,
-					})
-				: [],
-		[isSelected, element.animations, track.id, element.id, displayedStartTime, zoomLevel, elementLeft, elementWidth],
-	);
+		isSelected,
+		onSnapPointChange,
+		onResizeStateChange,
+		onElementMouseDown,
+		onElementClick,
+		dragState,
+		isDropTarget = false,
+	}: TimelineElementProps) {
+		const _editor = useEditor();
+		const { selectedElements } = useElementSelection();
+		const requestRevealMedia = useAssetsPanelStore((s) => s.requestRevealMedia);
 
-	const {
-		keyframeDragState,
-		handleKeyframeMouseDown,
-		handleKeyframeClick,
-		getVisualOffsetPx,
-	} = useKeyframeDrag({ zoomLevel, element, displayedStartTime });
-	const handleRevealInMedia = ({ event }: { event: React.MouseEvent }) => {
-		event.stopPropagation();
-		if (hasMediaId(element)) {
-			requestRevealMedia(element.mediaId);
-		}
-	};
+		// Subscribe only to "media" — avoids re-render on timeline/selection/renderer changes
+		const allAssets = useEditor((e) => e.media.getAssets(), ["media"]);
+		const assetsMap = useMemo(() => {
+			const map = new Map<string, MediaAsset>();
+			for (const a of allAssets) map.set(a.id, a);
+			return map;
+		}, [allAssets]);
 
-	const isMuted = canElementHaveAudio(element) && element.muted === true;
+		const mediaAsset: MediaAsset | null = hasMediaId(element)
+			? (assetsMap.get(element.mediaId) ?? null)
+			: null;
 
-	return (
-		<ContextMenu>
-			<ContextMenuTrigger asChild>
-				<div
-					className="absolute top-0 h-full select-none"
-					style={{
-						left: `${elementLeft}px`,
-						width: `${elementWidth}px`,
-						transform:
-							isBeingDragged && dragState.isDragging
-								? `translate3d(0, ${dragOffsetY}px, 0)`
-								: undefined,
-					}}
-				>
-					{/* #5 – tooltip de duração durante resize */}
-					{isResizing && (
-						<div className="pointer-events-none absolute -top-6 left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground shadow">
-							{currentDuration.toFixed(2)}s
-						</div>
-					)}
-					<ElementInner
-						element={element}
-						track={track}
-						isSelected={isSelected}
-						hasAudio={hasAudio}
-						onElementClick={onElementClick}
-						onElementMouseDown={onElementMouseDown}
-						handleResizeStart={handleResizeStart}
-						isDropTarget={isDropTarget}
-						zoomLevel={zoomLevel}
-					/>
-					{isSelected && (
-						<div className="pointer-events-none absolute inset-0 overflow-hidden">
-							<KeyframeIndicators
-								indicators={keyframeIndicators}
-								dragState={keyframeDragState}
-								displayedStartTime={displayedStartTime}
-								elementLeft={elementLeft}
-								onKeyframeMouseDown={handleKeyframeMouseDown}
-								onKeyframeClick={handleKeyframeClick}
-								getVisualOffsetPx={getVisualOffsetPx}
-							/>
-						</div>
-					)}
-				</div>
-			</ContextMenuTrigger>
-			<ContextMenuContent className="w-64">
-				<ActionMenuItem
-					action="split"
-					icon={<HugeiconsIcon icon={ScissorIcon} />}
-				>
-					Split
-				</ActionMenuItem>
-				<CopyMenuItem />
-				{canElementHaveAudio(element) && hasAudio && (
-					<MuteMenuItem
-						isMultipleSelected={selectedElements.length > 1}
-						isCurrentElementSelected={isCurrentElementSelected}
-						isMuted={isMuted}
-					/>
-				)}
-				{canElementBeHidden(element) && (
-					<VisibilityMenuItem
-						element={element}
-						isMultipleSelected={selectedElements.length > 1}
-						isCurrentElementSelected={isCurrentElementSelected}
-					/>
-				)}
-				{selectedElements.length === 1 && (
-					<ActionMenuItem
-						action="duplicate-selected"
-						icon={<HugeiconsIcon icon={Copy01Icon} />}
-					>
-						Duplicate
-					</ActionMenuItem>
-				)}
-				{selectedElements.length === 1 && hasMediaId(element) && (
-					<>
-						<ContextMenuItem
-							icon={<HugeiconsIcon icon={Search01Icon} />}
-							onClick={(event: React.MouseEvent) =>
-								handleRevealInMedia({ event })
-							}
-						>
-							Reveal media
-						</ContextMenuItem>
-						<ContextMenuItem
-							icon={<HugeiconsIcon icon={Exchange01Icon} />}
-							disabled
-						>
-							Replace media
-						</ContextMenuItem>
-					</>
-				)}
-				<ContextMenuSeparator />
-				<DeleteMenuItem
-					isMultipleSelected={selectedElements.length > 1}
-					isCurrentElementSelected={isCurrentElementSelected}
-					elementType={element.type}
-					selectedCount={selectedElements.length}
-				/>
-			</ContextMenuContent>
-		</ContextMenu>
-	);
-}, (prev, next) => {
-	// Skip re-render for elements not involved in the current drag
-	const prevDraggingThis = prev.dragState.elementId === prev.element.id && prev.dragState.isDragging;
-	const nextDraggingThis = next.dragState.elementId === next.element.id && next.dragState.isDragging;
-	if (!prevDraggingThis && !nextDraggingThis) {
-		return (
-			prev.element === next.element &&
-			prev.track === next.track &&
-			prev.zoomLevel === next.zoomLevel &&
-			prev.isSelected === next.isSelected &&
-			prev.isDropTarget === next.isDropTarget
+		const hasAudio = mediaSupportsAudio({ media: mediaAsset });
+
+		const { handleResizeStart, isResizing, currentStartTime, currentDuration } =
+			useTimelineElementResize({
+				element,
+				track,
+				zoomLevel,
+				onSnapPointChange,
+				onResizeStateChange,
+			});
+
+		const isCurrentElementSelected = selectedElements.some(
+			(selected) =>
+				selected.elementId === element.id && selected.trackId === track.id,
 		);
-	}
-	return false; // always re-render if being dragged
-});
+
+		const isBeingDragged = dragState.elementId === element.id;
+		const dragOffsetY =
+			isBeingDragged && dragState.isDragging
+				? dragState.currentMouseY - dragState.startMouseY
+				: 0;
+		const elementStartTime =
+			isBeingDragged && dragState.isDragging
+				? dragState.currentTime
+				: element.startTime;
+		const displayedStartTime = isResizing ? currentStartTime : elementStartTime;
+		const displayedDuration = isResizing ? currentDuration : element.duration;
+		const elementWidth = timelineTimeToPixels({
+			time: displayedDuration,
+			zoomLevel,
+		});
+		const elementLeft = timelineTimeToSnappedPixels({
+			time: displayedStartTime,
+			zoomLevel,
+		});
+		// #4 – memoize keyframe calculation (O(n) per render without this)
+		const keyframeIndicators = useMemo(
+			() =>
+				isSelected
+					? getKeyframeIndicators({
+							keyframes: getElementKeyframes({
+								animations: element.animations,
+							}),
+							trackId: track.id,
+							elementId: element.id,
+							displayedStartTime,
+							zoomLevel,
+							elementLeft,
+							elementWidth,
+						})
+					: [],
+			[
+				isSelected,
+				element.animations,
+				track.id,
+				element.id,
+				displayedStartTime,
+				zoomLevel,
+				elementLeft,
+				elementWidth,
+			],
+		);
+
+		const {
+			keyframeDragState,
+			handleKeyframeMouseDown,
+			handleKeyframeClick,
+			getVisualOffsetPx,
+		} = useKeyframeDrag({ zoomLevel, element, displayedStartTime });
+		const handleRevealInMedia = ({ event }: { event: React.MouseEvent }) => {
+			event.stopPropagation();
+			if (hasMediaId(element)) {
+				requestRevealMedia(element.mediaId);
+			}
+		};
+
+		const isMuted = canElementHaveAudio(element) && element.muted === true;
+
+		const elementStyle = useMemo(
+			() => ({
+				left: `${elementLeft}px`,
+				width: `${elementWidth}px`,
+				transform:
+					isBeingDragged && dragState.isDragging
+						? `translate3d(0, ${dragOffsetY}px, 0)`
+						: undefined,
+			}),
+			[
+				elementLeft,
+				elementWidth,
+				isBeingDragged,
+				dragState.isDragging,
+				dragOffsetY,
+			],
+		);
+
+		return (
+			<ContextMenu>
+				<ContextMenuTrigger asChild>
+					<div
+						className="absolute top-0 h-full select-none"
+						style={elementStyle}
+					>
+						{/* #5 – tooltip de duração durante resize */}
+						{isResizing && (
+							<div className="pointer-events-none absolute -top-6 left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground shadow">
+								{currentDuration.toFixed(2)}s
+							</div>
+						)}
+						<ElementInner
+							element={element}
+							track={track}
+							isSelected={isSelected}
+							hasAudio={hasAudio}
+							onElementClick={onElementClick}
+							onElementMouseDown={onElementMouseDown}
+							handleResizeStart={handleResizeStart}
+							isDropTarget={isDropTarget}
+							zoomLevel={zoomLevel}
+						/>
+						{isSelected && (
+							<div className="pointer-events-none absolute inset-0 overflow-hidden">
+								<KeyframeIndicators
+									indicators={keyframeIndicators}
+									dragState={keyframeDragState}
+									displayedStartTime={displayedStartTime}
+									elementLeft={elementLeft}
+									onKeyframeMouseDown={handleKeyframeMouseDown}
+									onKeyframeClick={handleKeyframeClick}
+									getVisualOffsetPx={getVisualOffsetPx}
+								/>
+							</div>
+						)}
+					</div>
+				</ContextMenuTrigger>
+				<ContextMenuContent className="w-64">
+					<ActionMenuItem
+						action="split"
+						icon={<HugeiconsIcon icon={ScissorIcon} />}
+					>
+						Split
+					</ActionMenuItem>
+					<CopyMenuItem />
+					{canElementHaveAudio(element) && hasAudio && (
+						<MuteMenuItem
+							isMultipleSelected={selectedElements.length > 1}
+							isCurrentElementSelected={isCurrentElementSelected}
+							isMuted={isMuted}
+						/>
+					)}
+					{canElementBeHidden(element) && (
+						<VisibilityMenuItem
+							element={element}
+							isMultipleSelected={selectedElements.length > 1}
+							isCurrentElementSelected={isCurrentElementSelected}
+						/>
+					)}
+					{selectedElements.length === 1 && (
+						<ActionMenuItem
+							action="duplicate-selected"
+							icon={<HugeiconsIcon icon={Copy01Icon} />}
+						>
+							Duplicate
+						</ActionMenuItem>
+					)}
+					{selectedElements.length === 1 && hasMediaId(element) && (
+						<>
+							<ContextMenuItem
+								icon={<HugeiconsIcon icon={Search01Icon} />}
+								onClick={(event: React.MouseEvent) =>
+									handleRevealInMedia({ event })
+								}
+							>
+								Reveal media
+							</ContextMenuItem>
+							<ContextMenuItem
+								icon={<HugeiconsIcon icon={Exchange01Icon} />}
+								disabled
+							>
+								Replace media
+							</ContextMenuItem>
+						</>
+					)}
+					<ContextMenuSeparator />
+					<DeleteMenuItem
+						isMultipleSelected={selectedElements.length > 1}
+						isCurrentElementSelected={isCurrentElementSelected}
+						elementType={element.type}
+						selectedCount={selectedElements.length}
+					/>
+				</ContextMenuContent>
+			</ContextMenu>
+		);
+	},
+	(prev, next) => {
+		// Skip re-render for elements not involved in the current drag
+		const prevDraggingThis =
+			prev.dragState.elementId === prev.element.id && prev.dragState.isDragging;
+		const nextDraggingThis =
+			next.dragState.elementId === next.element.id && next.dragState.isDragging;
+		if (!prevDraggingThis && !nextDraggingThis) {
+			return (
+				prev.element === next.element &&
+				prev.track === next.track &&
+				prev.zoomLevel === next.zoomLevel &&
+				prev.isSelected === next.isSelected &&
+				prev.isDropTarget === next.isDropTarget
+			);
+		}
+		return false; // always re-render if being dragged
+	},
+);
 TimelineElement.displayName = "TimelineElement";
 
 function ElementInner({
@@ -440,18 +467,26 @@ function ElementInner({
 		(state) => state.closeClipEffects,
 	);
 
-	const { handleMouseDown: handleFadeVolumeMouseDown } = useFadeVolumeInteraction({
-		element,
-		trackId: track.id,
+	const { handleMouseDown: handleFadeVolumeMouseDown } =
+		useFadeVolumeInteraction({
+			element,
+			trackId: track.id,
+			zoomLevel,
+		});
+
+	const fadeInWidth = timelineTimeToPixels({
+		time: element.fadeIn || 0,
 		zoomLevel,
 	});
-
-	const fadeInWidth = timelineTimeToPixels({ time: element.fadeIn || 0, zoomLevel });
-	const fadeOutWidth = timelineTimeToPixels({ time: element.fadeOut || 0, zoomLevel });
+	const fadeOutWidth = timelineTimeToPixels({
+		time: element.fadeOut || 0,
+		zoomLevel,
+	});
 	const trackHeight = getTrackHeight({ type: track.type });
-	const volumeY = (element.type === "audio" || hasAudio) && "volume" in element
-		? (1 - (element.volume ?? 1) / 2) * trackHeight 
-		: null;
+	const volumeY =
+		(element.type === "audio" || hasAudio) && "volume" in element
+			? (1 - (element.volume ?? 1) / 2) * trackHeight
+			: null;
 
 	return (
 		<div
@@ -474,15 +509,21 @@ function ElementInner({
 			>
 				{/* Fades Visualization */}
 				{element.fadeIn && (
-					<div 
+					<div
 						className="absolute top-0 bottom-0 left-0 bg-black/20 pointer-events-none"
-						style={{ width: fadeInWidth, clipPath: 'polygon(0 100%, 100% 0, 0 0)' }}
+						style={{
+							width: fadeInWidth,
+							clipPath: "polygon(0 100%, 100% 0, 0 0)",
+						}}
 					/>
 				)}
 				{element.fadeOut && (
-					<div 
+					<div
 						className="absolute top-0 bottom-0 right-0 bg-black/20 pointer-events-none"
-						style={{ width: fadeOutWidth, clipPath: 'polygon(0 0, 100% 0, 100% 100%)' }}
+						style={{
+							width: fadeOutWidth,
+							clipPath: "polygon(0 0, 100% 0, 100% 100%)",
+						}}
 					/>
 				)}
 
@@ -690,22 +731,31 @@ type ElementContentRenderer = (props: ElementContentRendererProps) => ReactNode;
 export function renderTiledMedia({
 	element,
 	imageUrl,
+	sourceWidth,
+	sourceHeight,
 	track,
 }: {
 	element: VisualElement;
 	imageUrl: string | undefined;
+	sourceWidth?: number;
+	sourceHeight?: number;
 	track: ElementContentProps["track"];
 }): ReactNode {
 	if (!imageUrl) {
 		return (
-			<span className="text-foreground/80 truncate text-xs">
-				{element.name}
-			</span>
+			<div className="flex size-full items-center bg-black/20 px-2">
+				<span className="text-white/90 truncate text-xs">{element.name}</span>
+			</div>
 		);
 	}
 
 	const trackHeight = getTrackHeight({ type: track.type });
-	const tileWidth = trackHeight * (16 / 9);
+	const aspectRatio =
+		sourceWidth && sourceHeight && sourceHeight > 0
+			? sourceWidth / sourceHeight
+			: 16 / 9;
+	const clampedAspectRatio = Math.max(0.45, Math.min(2.4, aspectRatio));
+	const tileWidth = Math.max(24, trackHeight * clampedAspectRatio);
 
 	return (
 		<div
@@ -850,6 +900,8 @@ const ELEMENT_CONTENT_RENDERERS: Record<
 		return renderTiledMedia({
 			element: videoElement,
 			imageUrl: mediaAsset?.thumbnailUrl,
+			sourceWidth: mediaAsset?.width,
+			sourceHeight: mediaAsset?.height,
 			track,
 		});
 	},
@@ -864,6 +916,8 @@ const ELEMENT_CONTENT_RENDERERS: Record<
 		return renderTiledMedia({
 			element: imageElement,
 			imageUrl: mediaAsset?.url,
+			sourceWidth: mediaAsset?.width,
+			sourceHeight: mediaAsset?.height,
 			track,
 		});
 	},

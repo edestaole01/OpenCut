@@ -61,7 +61,9 @@ export class MoveElementCommand extends Command {
 			throw new Error("Source track or element not found");
 		}
 
-		let targetTrack = this.savedState.find((track) => track.id === this.targetTrackId);
+		let targetTrack = this.savedState.find(
+			(track) => track.id === this.targetTrackId,
+		);
 		let tracksToUpdate = this.savedState;
 		if (!targetTrack && this.createTrack) {
 			const newTrack = buildEmptyTrack({
@@ -106,7 +108,7 @@ export class MoveElementCommand extends Command {
 				const remainingElements = track.elements.filter(
 					(trackElement) => trackElement.id !== this.elementId,
 				);
-				
+
 				const shiftedElements = this.rippleEnabled
 					? rippleShiftElements({
 							elements: remainingElements,
@@ -118,7 +120,7 @@ export class MoveElementCommand extends Command {
 				if (isSameTrack) {
 					// In same track, we now need to insert it back at the new position
 					const elementsAfterRemoval = shiftedElements;
-					
+
 					// If ripple is enabled, we push elements at the target position to make room
 					const targetElements = this.rippleEnabled
 						? rippleShiftElements({
@@ -128,9 +130,9 @@ export class MoveElementCommand extends Command {
 							})
 						: elementsAfterRemoval;
 
-					return { 
-						...track, 
-						elements: [...targetElements, movedElement] 
+					return {
+						...track,
+						elements: [...targetElements, movedElement],
 					} as typeof track;
 				}
 

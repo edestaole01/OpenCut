@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { toBlobURL } from "@ffmpeg/util";
 
@@ -9,59 +9,90 @@ let globalFFmpeg: FFmpeg | null = null;
 let loadPromise: Promise<void> | null = null;
 
 export function useFFmpeg() {
-  const ffmpegRef = useRef<FFmpeg | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isReady, setIsReady] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [progress, setProgress] = useState(0);
+	const ffmpegRef = useRef<FFmpeg | null>(null);
+	const [isLoading, setIsLoading] = useState(false);
+	const [isReady, setIsReady] = useState(false);
+	const [loadError, setLoadError] = useState<string | null>(null);
+	const [progress, setProgress] = useState(0);
+	const mountedRef = useRef(true);
 
-  const load = useCallback(async (): Promise<FFmpeg> => {
-    // Reuse existing instance
-    if (globalFFmpeg?.loaded) {
-      ffmpegRef.current = globalFFmpeg;
-      setIsReady(true);
-      return globalFFmpeg;
-    }
+	useEffect(() => {
+		mountedRef.current = true;
+		return () => {
+			mountedRef.current = false;
+		};
+	}, []);
 
-    // If already loading, wait
-    if (loadPromise) {
-      await loadPromise;
-      ffmpegRef.current = globalFFmpeg!;
-      setIsReady(true);
-      return globalFFmpeg!;
-    }
+	const load = useCallback(async (): Promise<FFmpeg> => {
+		// Reuse existing instance
+		if (globalFFmpeg?.loaded) {
+			ffmpegRef.current = globalFFmpeg;
+			if (mountedRef.current) setIsReady(true);
+			return globalFFmpeg;
+		}
 
-    setIsLoading(true);
-    setLoadError(null);
+		// If already loading, wait for the shared promise
+		if (loadPromise) {
+			if (mountedRef.current) setIsLoading(true);
+			try {
+				await loadPromise;
+				if (!globalFFmpeg) {
+					throw new Error("FFmpeg failed to initialize");
+				}
+				ffmpegRef.current = globalFFmpeg;
+				if (mountedRef.current) {
+					setIsReady(true);
+					setIsLoading(false);
+				}
+				return globalFFmpeg;
+			} catch (e) {
+				if (mountedRef.current) setIsLoading(false);
+				throw e;
+			}
+		}
 
-    const ffmpeg = new FFmpeg();
-    ffmpeg.on("progress", ({ progress: p }) => {
-      setProgress(Math.round(p * 100));
-    });
+		if (mountedRef.current) {
+			setIsLoading(true);
+			setLoadError(null);
+		}
 
-    loadPromise = (async () => {
-      const [coreURL, wasmURL] = await Promise.all([
-        toBlobURL(`${FFMPEG_BASE_URL}/ffmpeg-core.js`, "text/javascript"),
-        toBlobURL(`${FFMPEG_BASE_URL}/ffmpeg-core.wasm`, "application/wasm"),
-      ]);
-      await ffmpeg.load({ coreURL, wasmURL });
-      globalFFmpeg = ffmpeg;
-    })();
+		const ffmpeg = new FFmpeg();
+		ffmpeg.on("progress", ({ progress: p }) => {
+			if (mountedRef.current) setProgress(Math.round(p * 100));
+		});
 
-    try {
-      await loadPromise;
-      ffmpegRef.current = ffmpeg;
-      setIsReady(true);
-    } catch (e) {
-      loadPromise = null;
-      setLoadError("Erro ao carregar FFmpeg. Verifique sua conexão.");
-      throw e;
-    } finally {
-      setIsLoading(false);
-    }
+		loadPromise = (async () => {
+			const [coreURL, wasmURL] = await Promise.all([
+				toBlobURL(`${FFMPEG_BASE_URL}/ffmpeg-core.js`, "text/javascript"),
+				toBlobURL(`${FFMPEG_BASE_URL}/ffmpeg-core.wasm`, "application/wasm"),
+			]);
+			await ffmpeg.load({ coreURL, wasmURL });
+			globalFFmpeg = ffmpeg;
+		})();
 
-    return ffmpeg;
-  }, []);
+		try {
+			await loadPromise;
+			ffmpegRef.current = ffmpeg;
+			if (mountedRef.current) setIsReady(true);
+		} catch (e) {
+			loadPromise = null;
+			if (mountedRef.current)
+				setLoadError("Erro ao carregar FFmpeg. Verifique sua conexão.");
+			throw e;
+		} finally {
+			if (mountedRef.current) setIsLoading(false);
+		}
 
-  return { ffmpegRef, load, isLoading, isReady, loadError, progress, setProgress };
+		return ffmpeg;
+	}, []);
+
+	return {
+		ffmpegRef,
+		load,
+		isLoading,
+		isReady,
+		loadError,
+		progress,
+		setProgress,
+	};
 }

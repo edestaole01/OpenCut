@@ -280,21 +280,18 @@ const ColorPicker = forwardRef<HTMLDivElement, ColorPickerProps>(
 					)}
 					{...props}
 				>
-				<PopoverTrigger asChild>
-					<button
-						className="size-4.5 cursor-pointer border rounded-sm hover:ring-1 hover:ring-foreground/20 overflow-hidden relative"
-						type="button"
-					>
-						<span
-							className="absolute inset-0"
-							style={checkerboardStyle}
-						/>
-						<span
-							className="absolute inset-0"
-							style={{ backgroundColor: `#${value}` }}
-						/>
-					</button>
-				</PopoverTrigger>
+					<PopoverTrigger asChild>
+						<button
+							className="size-4.5 cursor-pointer border rounded-sm hover:ring-1 hover:ring-foreground/20 overflow-hidden relative"
+							type="button"
+						>
+							<span className="absolute inset-0" style={checkerboardStyle} />
+							<span
+								className="absolute inset-0"
+								style={{ backgroundColor: `#${value}` }}
+							/>
+						</button>
+					</PopoverTrigger>
 					<div className="flex flex-1 items-center">
 						<Input
 							className={cn(

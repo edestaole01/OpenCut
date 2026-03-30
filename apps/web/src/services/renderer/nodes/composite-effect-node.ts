@@ -24,7 +24,9 @@ export class CompositeEffectNode extends BaseNode<CompositeEffectNodeParams> {
 			width: renderer.width,
 			height: renderer.height,
 		});
-		const offscreenCtx = offscreen.getContext("2d") as OffscreenCanvasRenderingContext2D | null;
+		const offscreenCtx = offscreen.getContext(
+			"2d",
+		) as OffscreenCanvasRenderingContext2D | null;
 		if (!offscreenCtx) {
 			throw new Error("failed to get offscreen canvas context");
 		}

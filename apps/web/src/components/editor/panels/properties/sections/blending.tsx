@@ -7,7 +7,13 @@ import {
 } from "@/constants/timeline-constants";
 import { OcCheckerboardIcon } from "@opencut/ui/icons";
 import { Fragment, useRef } from "react";
-import { Section, SectionContent, SectionField, SectionHeader, SectionTitle } from "../section";
+import {
+	Section,
+	SectionContent,
+	SectionField,
+	SectionHeader,
+	SectionTitle,
+} from "../section";
 import {
 	Select,
 	SelectContent,
@@ -142,82 +148,84 @@ export function BlendingSection({
 	});
 
 	return (
-		<Section collapsible sectionKey={`${element.type}:blending`}>
-			<SectionHeader><SectionTitle>Blending</SectionTitle></SectionHeader>
-		<SectionContent>
-			<div className="flex items-start gap-2">
-				<SectionField
-					label="Opacity"
-					className="w-1/2"
-					beforeLabel={
-						<KeyframeToggle
-							isActive={opacity.isKeyframedAtTime}
-							isDisabled={!isPlayheadWithinElementRange}
-							title="Toggle opacity keyframe"
-							onToggle={opacity.toggleKeyframe}
-						/>
-					}
-				>
-					<NumberField
-						className="w-full"
-						icon={
-							<OcCheckerboardIcon className="size-3.5 text-muted-foreground" />
+		<Section collapsible sectionKey={`${element.type}:${element.id}:blending`}>
+			<SectionHeader>
+				<SectionTitle>Blending</SectionTitle>
+			</SectionHeader>
+			<SectionContent>
+				<div className="flex items-start gap-2">
+					<SectionField
+						label="Opacity"
+						className="w-1/2"
+						beforeLabel={
+							<KeyframeToggle
+								isActive={opacity.isKeyframedAtTime}
+								isDisabled={!isPlayheadWithinElementRange}
+								title="Toggle opacity keyframe"
+								onToggle={opacity.toggleKeyframe}
+							/>
 						}
-						value={opacity.displayValue}
-						min={0}
-						max={100}
-						onFocus={opacity.onFocus}
-						onChange={opacity.onChange}
-						onBlur={opacity.onBlur}
-						onScrub={opacity.scrubTo}
-						onScrubEnd={opacity.commitScrub}
-						onReset={() => opacity.commitValue({ value: DEFAULT_OPACITY })}
-						isDefault={isPropertyAtDefault({
-							hasAnimatedKeyframes: opacity.hasAnimatedKeyframes,
-							isPlayheadWithinElementRange,
-							resolvedValue: resolvedOpacity,
-							staticValue: element.opacity,
-							defaultValue: DEFAULT_OPACITY,
-						})}
-						dragSensitivity="slow"
-					/>
-				</SectionField>
-				<SectionField label="Blend mode" className="w-1/2">
-					<Select
-						value={committedBlendModeRef.current}
-						onOpenChange={handleBlendModeOpenChange}
-						onValueChange={commitBlendMode}
 					>
-						<SelectTrigger
-							icon={<HugeiconsIcon icon={RainDropIcon} />}
+						<NumberField
 							className="w-full"
+							icon={
+								<OcCheckerboardIcon className="size-3.5 text-muted-foreground" />
+							}
+							value={opacity.displayValue}
+							min={0}
+							max={100}
+							onFocus={opacity.onFocus}
+							onChange={opacity.onChange}
+							onBlur={opacity.onBlur}
+							onScrub={opacity.scrubTo}
+							onScrubEnd={opacity.commitScrub}
+							onReset={() => opacity.commitValue({ value: DEFAULT_OPACITY })}
+							isDefault={isPropertyAtDefault({
+								hasAnimatedKeyframes: opacity.hasAnimatedKeyframes,
+								isPlayheadWithinElementRange,
+								resolvedValue: resolvedOpacity,
+								staticValue: element.opacity,
+								defaultValue: DEFAULT_OPACITY,
+							})}
+							dragSensitivity="slow"
+						/>
+					</SectionField>
+					<SectionField label="Blend mode" className="w-1/2">
+						<Select
+							value={committedBlendModeRef.current}
+							onOpenChange={handleBlendModeOpenChange}
+							onValueChange={commitBlendMode}
 						>
-							<SelectValue placeholder="Select blend mode" />
-						</SelectTrigger>
-						<SelectContent className="w-36">
-							{BLEND_MODE_GROUPS.map((group, groupIndex) => (
-								<Fragment key={group[0]?.value ?? `group-${groupIndex}`}>
-									{group.map((option) => (
-										<SelectItem
-											key={option.value}
-											value={option.value}
-											onPointerEnter={() =>
-												previewBlendMode({ value: option.value as BlendMode })
-											}
-										>
-											{option.label}
-										</SelectItem>
-									))}
-									{groupIndex < BLEND_MODE_GROUPS.length - 1 ? (
-										<SelectSeparator />
-									) : null}
-								</Fragment>
-							))}
-						</SelectContent>
-					</Select>
-				</SectionField>
-			</div>
-		</SectionContent>
+							<SelectTrigger
+								icon={<HugeiconsIcon icon={RainDropIcon} />}
+								className="w-full"
+							>
+								<SelectValue placeholder="Select blend mode" />
+							</SelectTrigger>
+							<SelectContent className="w-36">
+								{BLEND_MODE_GROUPS.map((group, groupIndex) => (
+									<Fragment key={group[0]?.value ?? `group-${groupIndex}`}>
+										{group.map((option) => (
+											<SelectItem
+												key={option.value}
+												value={option.value}
+												onPointerEnter={() =>
+													previewBlendMode({ value: option.value as BlendMode })
+												}
+											>
+												{option.label}
+											</SelectItem>
+										))}
+										{groupIndex < BLEND_MODE_GROUPS.length - 1 ? (
+											<SelectSeparator />
+										) : null}
+									</Fragment>
+								))}
+							</SelectContent>
+						</Select>
+					</SectionField>
+				</div>
+			</SectionContent>
 		</Section>
 	);
 }

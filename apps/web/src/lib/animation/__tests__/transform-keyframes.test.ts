@@ -230,11 +230,15 @@ describe("keyframe query helpers", () => {
 			channels: {
 				"transform.position.x": {
 					valueKind: "number",
-					keyframes: [{ id: "x-1", time: 1, value: 64, interpolation: "linear" }],
+					keyframes: [
+						{ id: "x-1", time: 1, value: 64, interpolation: "linear" },
+					],
 				},
 				opacity: {
 					valueKind: "number",
-					keyframes: [{ id: "o-1", time: 0, value: 1, interpolation: "linear" }],
+					keyframes: [
+						{ id: "o-1", time: 0, value: 1, interpolation: "linear" },
+					],
 				},
 			},
 		};
@@ -263,7 +267,9 @@ describe("keyframe query helpers", () => {
 			channels: {
 				"transform.position.x": {
 					valueKind: "number",
-					keyframes: [{ id: "x-1", time: 1, value: 64, interpolation: "linear" }],
+					keyframes: [
+						{ id: "x-1", time: 1, value: 64, interpolation: "linear" },
+					],
 				},
 				"transform.position.y": {
 					valueKind: "number",

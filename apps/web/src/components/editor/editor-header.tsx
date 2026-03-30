@@ -19,7 +19,11 @@ import { ThemeToggle } from "../theme-toggle";
 import { DEFAULT_LOGO_URL, SOCIAL_LINKS } from "@/constants/site-constants";
 import { toast } from "sonner";
 import { useEditor } from "@/hooks/use-editor";
-import { CommandIcon, Logout05Icon, ArrowLeft01Icon } from "@hugeicons/core-free-icons";
+import {
+	CommandIcon,
+	Logout05Icon,
+	ArrowLeft01Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ShortcutsDialog } from "./dialogs/shortcuts-dialog";
 import Image from "next/image";
@@ -33,13 +37,17 @@ import {
 
 export function EditorHeader() {
 	return (
-		<header className="bg-background flex h-[3.4rem] items-center justify-between px-3 pt-0.5 border-b">
-			<div className="flex items-center gap-1">
+		<header className="bg-background flex h-[3.4rem] items-center justify-between px-3 pt-0.5 border-b shrink-0">
+			<div className="flex items-center gap-1 min-w-0">
 				<TooltipProvider>
 					<Tooltip delayDuration={300}>
 						<TooltipTrigger asChild>
 							<Link href="/dashboard">
-								<Button variant="ghost" size="icon" className="rounded-sm size-8 text-muted-foreground hover:text-foreground">
+								<Button
+									variant="ghost"
+									size="icon"
+									className="rounded-sm size-8 text-muted-foreground hover:text-foreground shrink-0"
+								>
 									<HugeiconsIcon icon={ArrowLeft01Icon} className="size-4" />
 								</Button>
 							</Link>
@@ -47,21 +55,13 @@ export function EditorHeader() {
 						<TooltipContent side="bottom">Voltar ao Dashboard</TooltipContent>
 					</Tooltip>
 				</TooltipProvider>
-				<div className="w-px h-5 bg-border mx-0.5" />
+				<div className="w-px h-5 bg-border mx-1 shrink-0" />
 				<ProjectDropdown />
 				<EditableProjectName />
 			</div>
-			<nav className="flex items-center gap-2">
-				<TooltipProvider>
-					<Tooltip delayDuration={300}>
-						<TooltipTrigger asChild>
-							<span>
-								<ExportButton />
-							</span>
-						</TooltipTrigger>
-						<TooltipContent side="bottom">Exportar vídeo (MP4 / WebM)</TooltipContent>
-					</Tooltip>
-				</TooltipProvider>
+			<nav className="flex items-center gap-1.5 shrink-0">
+				<ExportButton />
+				<div className="w-px h-5 bg-border mx-0.5" />
 				<ThemeToggle />
 			</nav>
 		</header>

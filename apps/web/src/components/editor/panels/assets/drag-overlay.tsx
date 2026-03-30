@@ -1,5 +1,10 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import { CloudUploadIcon, Video01Icon, MusicNote01Icon, Image01Icon } from "@hugeicons/core-free-icons";
+import {
+	CloudUploadIcon,
+	Video01Icon,
+	MusicNote01Icon,
+	Image01Icon,
+} from "@hugeicons/core-free-icons";
 
 interface MediaDragOverlayProps {
 	isVisible: boolean;
@@ -39,7 +44,9 @@ export function MediaDragOverlay({
 					<div className="flex flex-col items-center gap-3">
 						<div className="size-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
 						<p className="text-sm font-medium">Processando arquivos...</p>
-						<p className="text-xs text-muted-foreground">{progress}% concluído</p>
+						<p className="text-xs text-muted-foreground">
+							{progress}% concluído
+						</p>
 					</div>
 					<div className="w-full max-w-[180px]">
 						<div className="bg-muted/50 h-1.5 w-full rounded-full overflow-hidden">
@@ -54,7 +61,10 @@ export function MediaDragOverlay({
 				<>
 					<div className="flex flex-col items-center gap-3">
 						<div className="size-14 rounded-2xl bg-primary/10 border-2 border-dashed border-primary/40 flex items-center justify-center">
-							<HugeiconsIcon icon={CloudUploadIcon} className="text-primary size-7" />
+							<HugeiconsIcon
+								icon={CloudUploadIcon}
+								className="text-primary size-7"
+							/>
 						</div>
 						<div className="space-y-1">
 							<p className="text-sm font-semibold">Importar Mídia</p>

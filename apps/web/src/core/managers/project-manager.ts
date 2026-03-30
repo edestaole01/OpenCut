@@ -79,7 +79,13 @@ export class ProjectManager {
 		await this.storageMigrationPromise;
 	}
 
-	async createNewProject({ name }: { name: string }): Promise<string> {
+	async createNewProject({
+		name,
+		settings,
+	}: {
+		name: string;
+		settings?: Partial<TProjectSettings>;
+	}): Promise<string> {
 		this.editor.save.pause();
 		const mainScene = buildDefaultScene({ name: "Main scene", isMain: true });
 		const newProject: TProject = {
@@ -93,10 +99,10 @@ export class ProjectManager {
 			scenes: [mainScene],
 			currentSceneId: mainScene.id,
 			settings: {
-				fps: DEFAULT_FPS,
-				canvasSize: DEFAULT_CANVAS_SIZE,
-				originalCanvasSize: null,
-				background: {
+				fps: settings?.fps ?? DEFAULT_FPS,
+				canvasSize: settings?.canvasSize ?? DEFAULT_CANVAS_SIZE,
+				originalCanvasSize: settings?.originalCanvasSize ?? null,
+				background: settings?.background ?? {
 					type: "color",
 					color: DEFAULT_COLOR,
 				},

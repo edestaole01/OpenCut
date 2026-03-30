@@ -4,6 +4,7 @@ import { storageService } from "@/services/storage/service";
 import { generateUUID } from "@/utils/id";
 import { videoCache } from "@/services/video-cache/service";
 import { hasMediaId } from "@/lib/timeline/element-utils";
+import { generateThumbnail } from "@/lib/media/processing";
 
 export class MediaManager {
 	private assets: MediaAsset[] = [];
@@ -19,8 +20,26 @@ export class MediaManager {
 		projectId: string;
 		asset: Omit<MediaAsset, "id">;
 	}): Promise<string> {
+		let normalizedAsset = asset;
+		if (asset.type === "video" && !asset.thumbnailUrl) {
+			try {
+				normalizedAsset = {
+					...asset,
+					thumbnailUrl: await generateThumbnail({
+						videoFile: asset.file,
+						timeInSeconds: 1,
+					}),
+				};
+			} catch (error) {
+				console.warn(
+					"Failed to generate video thumbnail during addMediaAsset:",
+					error,
+				);
+			}
+		}
+
 		const newAsset: MediaAsset = {
-			...asset,
+			...normalizedAsset,
 			id: generateUUID(),
 		};
 
@@ -31,10 +50,15 @@ export class MediaManager {
 			await storageService.saveMediaAsset({ projectId, mediaAsset: newAsset });
 			return newAsset.id;
 		} catch (error) {
-			console.error("Failed to save media asset:", error);
-			this.assets = this.assets.filter((asset) => asset.id !== newAsset.id);
+			console.warn(
+				"Failed to persist media asset. Keeping it in memory for this session:",
+				error,
+			);
+			this.assets = this.assets.map((asset) =>
+				asset.id === newAsset.id ? { ...asset, ephemeral: true } : asset,
+			);
 			this.notify();
-			throw error;
+			return newAsset.id;
 		}
 	}
 
@@ -91,6 +115,7 @@ export class MediaManager {
 			});
 			this.assets = mediaAssets;
 			this.notify();
+			void this.ensureVideoThumbnails({ projectId });
 		} catch (error) {
 			console.error("Failed to load media assets:", error);
 		} finally {
@@ -162,5 +187,62 @@ export class MediaManager {
 		this.listeners.forEach((fn) => {
 			fn();
 		});
+	}
+
+	private async ensureVideoThumbnails({
+		projectId,
+	}: {
+		projectId: string;
+	}): Promise<void> {
+		const missingThumbnailVideos = this.assets.filter(
+			(asset) => asset.type === "video" && !asset.thumbnailUrl,
+		);
+		if (missingThumbnailVideos.length === 0) {
+			return;
+		}
+
+		let hasUpdates = false;
+		let nextAssets = [...this.assets];
+		const updatedAssets: MediaAsset[] = [];
+
+		for (const asset of missingThumbnailVideos) {
+			try {
+				const thumbnailUrl = await generateThumbnail({
+					videoFile: asset.file,
+					timeInSeconds: 1,
+				});
+				if (!thumbnailUrl) {
+					continue;
+				}
+
+				nextAssets = nextAssets.map((existing) =>
+					existing.id === asset.id ? { ...existing, thumbnailUrl } : existing,
+				);
+				updatedAssets.push({ ...asset, thumbnailUrl });
+				hasUpdates = true;
+			} catch (error) {
+				console.warn(
+					`Failed to backfill thumbnail for video asset ${asset.id}:`,
+					error,
+				);
+			}
+		}
+
+		if (!hasUpdates) {
+			return;
+		}
+
+		this.assets = nextAssets;
+		this.notify();
+
+		await Promise.all(
+			updatedAssets.map((asset) =>
+				storageService
+					.saveMediaAsset({ projectId, mediaAsset: asset })
+					.catch((error) => {
+						console.error("Failed to persist media asset thumbnail:", error);
+					}),
+			),
+		);
 	}
 }

@@ -25,7 +25,10 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { uppercase } from "@/utils/string";
 import { clamp } from "@/utils/math";
-import { timelineTimeToPixels, timelineTimeToSnappedPixels } from "@/lib/timeline";
+import {
+	timelineTimeToPixels,
+	timelineTimeToSnappedPixels,
+} from "@/lib/timeline";
 
 const MIN_BOOKMARK_WIDTH_PX = 2;
 const BOOKMARK_MARKER_WIDTH_PX = 12;
@@ -77,13 +80,13 @@ export function TimelineBookmarksRow({
 
 	return (
 		<div className="relative h-4 flex-1 overflow-hidden">
-			<button
+			{/* biome-ignore lint/a11y/noStaticElementInteractions: timeline bookmark rail handles clicks */}
+			<div
 				className="relative h-4 w-full cursor-default select-none border-0 bg-transparent p-0"
 				style={{
 					width: `${dynamicTimelineWidth}px`,
 				}}
-				aria-label="Timeline ruler"
-				type="button"
+				role="presentation"
 				onWheel={handleWheel}
 				onClick={(event) => {
 					if (!event.currentTarget.contains(event.target as Node)) return;
@@ -104,7 +107,7 @@ export function TimelineBookmarksRow({
 						onBookmarkMouseDown={onBookmarkMouseDown}
 					/>
 				))}
-			</button>
+			</div>
 		</div>
 	);
 }

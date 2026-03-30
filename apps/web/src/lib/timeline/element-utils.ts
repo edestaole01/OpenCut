@@ -180,6 +180,7 @@ export function buildTextElement({
 		fontWeight: t.fontWeight ?? DEFAULT_TEXT_ELEMENT.fontWeight,
 		fontStyle: t.fontStyle ?? DEFAULT_TEXT_ELEMENT.fontStyle,
 		textDecoration: t.textDecoration ?? DEFAULT_TEXT_ELEMENT.textDecoration,
+		textTransform: t.textTransform ?? "none",
 		letterSpacing: t.letterSpacing ?? DEFAULT_TEXT_ELEMENT.letterSpacing,
 		lineHeight: t.lineHeight ?? DEFAULT_TEXT_ELEMENT.lineHeight,
 		transform: t.transform ?? DEFAULT_TEXT_ELEMENT.transform,

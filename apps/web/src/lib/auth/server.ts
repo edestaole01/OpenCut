@@ -4,8 +4,9 @@ import { db } from "@/lib/db";
 import { webEnv } from "@opencut/env/web";
 
 // Generate trusted origins for all common localhost ports
-const localhostPorts = Array.from({ length: 20 }, (_, i) =>
-	`http://localhost:${3000 + i}`
+const localhostPorts = Array.from(
+	{ length: 20 },
+	(_, i) => `http://localhost:${3000 + i}`,
 );
 
 export const auth = betterAuth({

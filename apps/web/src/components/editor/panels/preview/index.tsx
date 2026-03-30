@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef } from "react";
-import useDeepCompareEffect from "use-deep-compare-effect";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { useEditor } from "@/hooks/use-editor";
 import { useRafLoop } from "@/hooks/use-raf-loop";
 import { useContainerSize } from "@/hooks/use-container-size";
@@ -51,21 +50,45 @@ export function PreviewPanel() {
 	);
 }
 
-function RenderTreeController() {
+const RenderTreeController = memo(function RenderTreeController() {
 	const editor = useEditor();
-	const tracks = editor.timeline.getTracks();
-	const mediaAssets = editor.media.getAssets();
-	const activeProject = editor.project.getActive();
+	// Granular subscriptions — each only re-renders when its manager changes
+	const tracks = useEditor((e) => e.timeline.getTracks(), ["timeline"]);
+	const mediaAssets = useEditor((e) => e.media.getAssets(), ["media"]);
+	const activeProject = useEditor((e) => e.project.getActive(), ["project"]);
 
 	const { width, height } = usePreviewSize();
 
-	useDeepCompareEffect(() => {
+	// Stable string fingerprints so regular useEffect can compare primitives
+	// instead of deep-comparing nested arrays on every render.
+	const _tracksKey = useMemo(
+		() =>
+			tracks
+				.map(
+					(t) =>
+						`${t.id}:${t.elements.map((e) => `${e.id}|${e.startTime}|${e.duration}`).join(",")}`,
+				)
+				.join("|"),
+		[tracks],
+	);
+	const _mediaKey = useMemo(
+		() => mediaAssets.map((a) => a.id).join(","),
+		[mediaAssets],
+	);
+	const _backgroundKey = JSON.stringify(activeProject?.settings.background);
+
+	const tracksRef = useRef(tracks);
+	tracksRef.current = tracks;
+	const mediaRef = useRef(mediaAssets);
+	mediaRef.current = mediaAssets;
+
+	useEffect(() => {
 		if (!activeProject) return;
 
 		const duration = editor.timeline.getTotalDuration();
 		const renderTree = buildScene({
-			tracks,
-			mediaAssets,
+			tracks: tracksRef.current,
+			mediaAssets: mediaRef.current,
 			duration,
 			canvasSize: { width, height },
 			background: activeProject.settings.background,
@@ -73,12 +96,18 @@ function RenderTreeController() {
 		});
 
 		editor.renderer.setRenderTree({ renderTree });
-	}, [tracks, mediaAssets, activeProject?.settings.background, width, height]);
+	}, [
+		width,
+		height,
+		editor,
+		activeProject,
+		activeProject?.settings.background,
+	]);
 
 	return null;
-}
+});
 
-function PreviewCanvas({
+const PreviewCanvas = memo(function PreviewCanvas({
 	onToggleFullscreen,
 	containerRef,
 }: {
@@ -95,7 +124,7 @@ function PreviewCanvas({
 	const containerSize = useContainerSize({ containerRef: outerContainerRef });
 	const editor = useEditor();
 	const activeProject = editor.project.getActive();
-	const { overlays } = usePreviewStore();
+	const bookmarksVisible = usePreviewStore((s) => s.overlays.bookmarks);
 
 	const renderer = useMemo(() => {
 		return new CanvasRenderer({
@@ -198,7 +227,7 @@ function PreviewCanvas({
 							canvasRef={canvasRef}
 							containerRef={canvasBoundsRef}
 						/>
-						{overlays.bookmarks && <BookmarkNoteOverlay />}
+						{bookmarksVisible && <BookmarkNoteOverlay />}
 					</div>
 				</ContextMenuTrigger>
 				<PreviewContextMenu
@@ -208,4 +237,4 @@ function PreviewCanvas({
 			</ContextMenu>
 		</div>
 	);
-}
+});

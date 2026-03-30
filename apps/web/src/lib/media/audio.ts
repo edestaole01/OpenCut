@@ -18,7 +18,11 @@ export type CollectedAudioElement = Omit<
 	"type" | "mediaId" | "volume" | "id" | "name" | "sourceType" | "sourceUrl"
 > & { buffer: AudioBuffer };
 
-export function createAudioContext({ sampleRate }: { sampleRate?: number } = {}): AudioContext {
+export function createAudioContext({
+	sampleRate,
+}: {
+	sampleRate?: number;
+} = {}): AudioContext {
 	const AudioContextConstructor =
 		window.AudioContext ||
 		(window as typeof window & { webkitAudioContext?: typeof AudioContext })
@@ -37,11 +41,51 @@ export async function decodeAudioToFloat32({
 }: {
 	audioBlob: Blob;
 }): Promise<DecodedAudio> {
-	const audioContext = createAudioContext();
 	const arrayBuffer = await audioBlob.arrayBuffer();
+	const view = new DataView(arrayBuffer);
+
+	// Fast path: parse WAV directly to avoid AudioContext resampling
+	const isWav =
+		view.byteLength >= 44 && view.getUint32(0, false) === 0x52494646; // "RIFF"
+
+	if (isWav) {
+		const sampleRate = view.getUint32(24, true);
+		const numChannels = view.getUint16(22, true);
+		const bitsPerSample = view.getUint16(34, true);
+
+		// Find "data" chunk (scan past fmt and any extra chunks)
+		let dataOffset = 12;
+		while (dataOffset + 8 <= view.byteLength) {
+			const chunkId = view.getUint32(dataOffset, false);
+			const chunkSize = view.getUint32(dataOffset + 4, true);
+			dataOffset += 8;
+			if (chunkId === 0x64617461) break; // "data"
+			dataOffset += chunkSize;
+		}
+
+		const bytesPerSample = bitsPerSample / 8;
+		const numFrames = Math.floor(
+			(view.byteLength - dataOffset) / (numChannels * bytesPerSample),
+		);
+		const samples = new Float32Array(numFrames);
+
+		for (let i = 0; i < numFrames; i++) {
+			let sum = 0;
+			for (let ch = 0; ch < numChannels; ch++) {
+				const offset = dataOffset + (i * numChannels + ch) * bytesPerSample;
+				const s16 = view.getInt16(offset, true);
+				sum += s16 / 32768.0;
+			}
+			samples[i] = sum / numChannels;
+		}
+
+		return { samples, sampleRate };
+	}
+
+	// Fallback for non-WAV audio
+	const audioContext = createAudioContext();
 	const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-	// mix down to mono
 	const numChannels = audioBuffer.numberOfChannels;
 	const length = audioBuffer.length;
 	const samples = new Float32Array(length);
@@ -197,7 +241,10 @@ async function resolveAudioBufferForVideoElement({
 		if (chunks.length === 0) return null;
 
 		const nativeSampleRate = chunks[0].sampleRate;
-		const numChannels = Math.min(MAX_AUDIO_CHANNELS, chunks[0].numberOfChannels);
+		const numChannels = Math.min(
+			MAX_AUDIO_CHANNELS,
+			chunks[0].numberOfChannels,
+		);
 
 		const nativeChannels = Array.from(
 			{ length: numChannels },
@@ -206,17 +253,29 @@ async function resolveAudioBufferForVideoElement({
 		let offset = 0;
 		for (const chunk of chunks) {
 			for (let channel = 0; channel < numChannels; channel++) {
-				const sourceData = chunk.getChannelData(Math.min(channel, chunk.numberOfChannels - 1));
+				const sourceData = chunk.getChannelData(
+					Math.min(channel, chunk.numberOfChannels - 1),
+				);
 				nativeChannels[channel].set(sourceData, offset);
 			}
 			offset += chunk.length;
 		}
 
 		// use OfflineAudioContext for high-quality resampling to target rate
-		const outputSamples = Math.ceil(totalSamples * (targetSampleRate / nativeSampleRate));
-		const offlineContext = new OfflineAudioContext(numChannels, outputSamples, targetSampleRate);
+		const outputSamples = Math.ceil(
+			totalSamples * (targetSampleRate / nativeSampleRate),
+		);
+		const offlineContext = new OfflineAudioContext(
+			numChannels,
+			outputSamples,
+			targetSampleRate,
+		);
 
-		const nativeBuffer = audioContext.createBuffer(numChannels, totalSamples, nativeSampleRate);
+		const nativeBuffer = audioContext.createBuffer(
+			numChannels,
+			totalSamples,
+			nativeSampleRate,
+		);
 		for (let ch = 0; ch < numChannels; ch++) {
 			nativeBuffer.copyToChannel(nativeChannels[ch], ch);
 		}

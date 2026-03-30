@@ -123,12 +123,8 @@ export class PlaybackManager {
 	}
 
 	private startTimer(): void {
-		if (this.playbackTimer) {
-			cancelAnimationFrame(this.playbackTimer);
-		}
-
 		this.lastUpdate = performance.now();
-		this.updateTime();
+		this.playbackTimer = requestAnimationFrame(this.updateTime);
 	}
 
 	private stopTimer(): void {
@@ -145,30 +141,25 @@ export class PlaybackManager {
 		const delta = (now - this.lastUpdate) / 1000;
 		this.lastUpdate = now;
 
-		const newTime = this.currentTime + delta;
 		const duration = this.editor.timeline.getTotalDuration();
+		let newTime = this.currentTime + delta;
 
 		if (duration > 0 && newTime >= duration) {
+			newTime = duration;
 			this.pause();
-			this.currentTime = duration;
-			this.notify();
-
-			window.dispatchEvent(
-				new CustomEvent("playback-seek", {
-					detail: { time: duration },
-				}),
-			);
-		} else {
-			this.currentTime = newTime;
-			this.notify();
-
-			window.dispatchEvent(
-				new CustomEvent("playback-update", {
-					detail: { time: newTime },
-				}),
-			);
 		}
 
-		this.playbackTimer = requestAnimationFrame(this.updateTime);
+		this.currentTime = newTime;
+		this.notify();
+
+		window.dispatchEvent(
+			new CustomEvent("playback-update", {
+				detail: { time: newTime },
+			}),
+		);
+
+		if (this.isPlaying) {
+			this.playbackTimer = requestAnimationFrame(this.updateTime);
+		}
 	};
 }

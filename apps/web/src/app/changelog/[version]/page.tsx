@@ -52,20 +52,20 @@ export default async function ReleaseDetailPage({ params }: Props) {
 					All releases
 				</Link>
 
-			<ReleaseArticle variant="detail">
-				<div className="flex flex-col gap-4">
-					<div className="flex items-center justify-between">
-						<ReleaseMeta release={release} />
-						<CopyMarkdownButton
-							description={release.description}
-							changes={release.changes}
-						/>
+				<ReleaseArticle variant="detail">
+					<div className="flex flex-col gap-4">
+						<div className="flex items-center justify-between">
+							<ReleaseMeta release={release} />
+							<CopyMarkdownButton
+								description={release.description}
+								changes={release.changes}
+							/>
+						</div>
+						<ReleaseTitle as="h1">{release.title}</ReleaseTitle>
+						{release.description && (
+							<ReleaseDescription>{release.description}</ReleaseDescription>
+						)}
 					</div>
-					<ReleaseTitle as="h1">{release.title}</ReleaseTitle>
-					{release.description && (
-						<ReleaseDescription>{release.description}</ReleaseDescription>
-					)}
-				</div>
 					<ReleaseChanges release={release} />
 				</ReleaseArticle>
 

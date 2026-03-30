@@ -65,12 +65,12 @@ export class UpdateClipEffectParamsCommand extends Command {
 			trackId: this.trackId,
 			elementId: this.elementId,
 			elementPredicate: isVisualElement,
-		update: (element) => {
-			return updateEffectParamsOnElement({
-				element: element as VisualElement,
-				effectId: this.effectId,
-				params: this.params,
-			});
+			update: (element) => {
+				return updateEffectParamsOnElement({
+					element: element as VisualElement,
+					effectId: this.effectId,
+					params: this.params,
+				});
 			},
 		});
 

@@ -1,6 +1,12 @@
-import type { AnimationPropertyPath, ElementAnimations } from "@/types/animation";
+import type {
+	AnimationPropertyPath,
+	ElementAnimations,
+} from "@/types/animation";
 import type { Transform } from "@/types/timeline";
-import { getColorValueAtTime, getNumberChannelValueAtTime } from "./interpolation";
+import {
+	getColorValueAtTime,
+	getNumberChannelValueAtTime,
+} from "./interpolation";
 import { getColorChannelForPath } from "./color-channel";
 import { getNumberChannelForPath } from "./number-channel";
 

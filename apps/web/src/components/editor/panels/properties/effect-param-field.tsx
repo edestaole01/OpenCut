@@ -1,6 +1,9 @@
 "use client";
 
-import type { EffectParamDefinition, NumberEffectParamDefinition } from "@/types/effects";
+import type {
+	EffectParamDefinition,
+	NumberEffectParamDefinition,
+} from "@/types/effects";
 import { clamp } from "@/utils/math";
 import { SectionField } from "./section";
 import { Slider } from "@/components/ui/slider";
@@ -28,7 +31,12 @@ export function EffectParamField({
 }) {
 	return (
 		<SectionField label={param.label}>
-			<EffectParamInput param={param} value={value} onPreview={onPreview} onCommit={onCommit} />
+			<EffectParamInput
+				param={param}
+				value={value}
+				onPreview={onPreview}
+				onCommit={onCommit}
+			/>
 		</SectionField>
 	);
 }

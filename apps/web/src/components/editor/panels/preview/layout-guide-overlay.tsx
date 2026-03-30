@@ -18,7 +18,7 @@ function TikTokGuide() {
 }
 
 export function LayoutGuideOverlay() {
-	const { layoutGuide } = usePreviewStore();
+	const layoutGuide = usePreviewStore((s) => s.layoutGuide);
 
 	if (layoutGuide.platform === null) return null;
 	if (layoutGuide.platform === "tiktok") return <TikTokGuide />;

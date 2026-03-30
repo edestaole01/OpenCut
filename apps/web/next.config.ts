@@ -33,7 +33,7 @@ const nextConfig: NextConfig = {
 		removeConsole: process.env.NODE_ENV === "production",
 	},
 	reactStrictMode: true,
-	productionBrowserSourceMaps: true,
+	productionBrowserSourceMaps: false,
 	output: "standalone",
 	images: {
 		remotePatterns: [

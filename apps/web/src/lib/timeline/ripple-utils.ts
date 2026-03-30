@@ -23,7 +23,9 @@ export function closeGapsOnTrack({
 }): TimelineElement[] {
 	if (elements.length === 0) return [];
 
-	const sortedElements = [...elements].sort((a, b) => a.startTime - b.startTime);
+	const sortedElements = [...elements].sort(
+		(a, b) => a.startTime - b.startTime,
+	);
 	const updatedElements: TimelineElement[] = [];
 	let nextStartTime = 0;
 

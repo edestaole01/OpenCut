@@ -8,6 +8,9 @@ export class OPFSAdapter implements StorageAdapter<File> {
 	}
 
 	private async getDirectory(): Promise<FileSystemDirectoryHandle> {
+		if (!OPFSAdapter.isSupported()) {
+			throw new Error("OPFS is not supported in this browser/context");
+		}
 		const opfsRoot = await navigator.storage.getDirectory();
 		return await opfsRoot.getDirectoryHandle(this.directoryName, {
 			create: true,
@@ -70,6 +73,11 @@ export class OPFSAdapter implements StorageAdapter<File> {
 
 	// Helper method to check OPFS support
 	static isSupported(): boolean {
-		return "storage" in navigator && "getDirectory" in navigator.storage;
+		return (
+			typeof navigator !== "undefined" &&
+			"storage" in navigator &&
+			!!navigator.storage &&
+			"getDirectory" in navigator.storage
+		);
 	}
 }

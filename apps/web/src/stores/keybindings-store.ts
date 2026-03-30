@@ -90,9 +90,9 @@ export const useKeybindingsStore = create<KeybindingsState>()(
 				set({ keybindingsEnabled: false });
 			},
 
-		importKeybindings: (config: KeybindingConfig) => {
-			for (const [key] of Object.entries(config)) {
-				if (typeof key !== "string" || key.length === 0) {
+			importKeybindings: (config: KeybindingConfig) => {
+				for (const [key] of Object.entries(config)) {
+					if (typeof key !== "string" || key.length === 0) {
 						throw new Error(`Invalid key format: ${key}`);
 					}
 				}
@@ -169,7 +169,10 @@ function generateKeybindingString(ev: KeyboardEvent): ShortcutKey | null {
 		return `${modifierKey}+${key}` as ShortcutKey;
 	}
 
-	if (isDOMElement(target) && isTypableDOMElement({ element: target as HTMLElement }))
+	if (
+		isDOMElement(target) &&
+		isTypableDOMElement({ element: target as HTMLElement })
+	)
 		return null;
 
 	return `${key}` as ShortcutKey;

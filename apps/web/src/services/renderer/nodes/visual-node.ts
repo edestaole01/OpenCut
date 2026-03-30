@@ -29,7 +29,11 @@ export interface VisualNodeParams {
 	fadeIn?: number;
 	fadeOut?: number;
 	transitionIn?: { type: string; duration: number; params?: EffectParamValues };
-	transitionOut?: { type: string; duration: number; params?: EffectParamValues };
+	transitionOut?: {
+		type: string;
+		duration: number;
+		params?: EffectParamValues;
+	};
 }
 
 export abstract class VisualNode<
@@ -70,7 +74,9 @@ export abstract class VisualNode<
 	}): void {
 		renderer.context.save();
 
-		const animationLocalTime = this.getAnimationLocalTime({ time: timelineTime });
+		const animationLocalTime = this.getAnimationLocalTime({
+			time: timelineTime,
+		});
 		const transform = resolveTransformAtTime({
 			baseTransform: this.params.transform,
 			animations: this.params.animations,
@@ -113,15 +119,24 @@ export abstract class VisualNode<
 
 		// Transition Logic
 		let activeTransition: { type: string; progress: number } | null = null;
-		if (this.params.transitionIn && animationLocalTime < this.params.transitionIn.duration) {
+		if (
+			this.params.transitionIn &&
+			animationLocalTime < this.params.transitionIn.duration
+		) {
 			activeTransition = {
 				type: this.params.transitionIn.type,
 				progress: animationLocalTime / this.params.transitionIn.duration,
 			};
-		} else if (this.params.transitionOut && animationLocalTime > this.params.duration - this.params.transitionOut.duration) {
+		} else if (
+			this.params.transitionOut &&
+			animationLocalTime >
+				this.params.duration - this.params.transitionOut.duration
+		) {
 			activeTransition = {
 				type: this.params.transitionOut.type,
-				progress: (this.params.duration - animationLocalTime) / this.params.transitionOut.duration,
+				progress:
+					(this.params.duration - animationLocalTime) /
+					this.params.transitionOut.duration,
 			};
 		}
 
@@ -193,13 +208,7 @@ export abstract class VisualNode<
 			});
 		}
 
-		renderer.context.drawImage(
-			currentResult,
-			x,
-			y,
-			scaledWidth,
-			scaledHeight,
-		);
+		renderer.context.drawImage(currentResult, x, y, scaledWidth, scaledHeight);
 		renderer.context.restore();
 	}
 }
