@@ -1,7 +1,7 @@
 export const formatTime = (s: number) => {
 	const m = Math.floor(s / 60);
-	const sec = s % 60;
-	return `${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
+	const sec = Math.round((s % 60) * 10) / 10;
+	return `${m.toString().padStart(2, "0")}:${sec < 10 ? "0" : ""}${sec.toFixed(1).replace(".0", "")}`;
 };
 
 export function parseTimestampedTranscriptSegments(
@@ -10,7 +10,7 @@ export function parseTimestampedTranscriptSegments(
 	if (!transcript) return [];
 
 	const markerRegex =
-		/(?:^|[\s\n])(?:\[|\()?([0-9]{1,2}):([0-9]{2})(?::([0-9]{2}))?(?:\]|\))?\s*[-:]?\s*/g;
+		/(?:^|[\s\n])(?:\[|\()?([0-9]{1,2}):([0-9]{2})(?::([0-9]{2}))?(?:[.,]([0-9]{1,3}))?(?:\]|\))?\s*[-:]?\s*/g;
 
 	interface Marker {
 		time: number;
@@ -27,10 +27,15 @@ export function parseTimestampedTranscriptSegments(
 		const first = Number(m[1]);
 		const second = Number(m[2]);
 		const third = m[3] !== undefined ? Number(m[3]) : undefined;
-		const time =
+		const milliseconds = m[4] !== undefined ? Number(m[4].padEnd(3, "0")) : 0;
+
+		let time =
 			third !== undefined
 				? first * 3600 + second * 60 + third
 				: first * 60 + second;
+
+		time += milliseconds / 1000;
+
 		markers.push({ time, rawTag: m[0], index: m.index });
 	}
 
@@ -43,8 +48,13 @@ export function parseTimestampedTranscriptSegments(
 			i + 1 < markers.length ? markers[i + 1].index : transcript.length;
 		const text = transcript.slice(tagEnd, textEnd).trim();
 		const start = markers[i].time;
+
+		// End = start of the NEXT segment (mirrors server-side extractTimestampSegments).
+		// Last segment extends to POSITIVE_INFINITY so it always overlaps with any
+		// clip window that includes it.
 		const end =
 			i + 1 < markers.length ? markers[i + 1].time : Number.POSITIVE_INFINITY;
+
 		if (text) segments.push({ start, end, text });
 	}
 
@@ -58,10 +68,12 @@ export function getClipTranscriptSegments(
 ): Array<{ start: number; end: number; text: string }> {
 	const segments = parseTimestampedTranscriptSegments(transcript);
 	if (segments.length === 0) return [];
-	const margin = 3;
-	return segments.filter(
-		(s) => s.end >= startSec - margin && s.start <= endSec + margin,
-	);
+	// Strict overlap: segment ending exactly at clip start (overlap=0) is excluded.
+	// Segments that genuinely overlap the clip window are included.
+	return segments.filter((s) => {
+		const overlap = Math.min(s.end, endSec) - Math.max(s.start, startSec);
+		return overlap > 0;
+	});
 }
 
 export function extractClipTranscript(

@@ -346,8 +346,9 @@ function StockItemCard({
 	}
 
 	return (
-		<button
-			type="button"
+		<div
+			role="button"
+			tabIndex={0}
 			className="group relative w-full cursor-pointer overflow-hidden rounded-md"
 			style={{ aspectRatio: item.width / item.height }}
 			onClick={state !== "adding" ? onAdd : undefined}
@@ -361,6 +362,6 @@ function StockItemCard({
 			}
 		>
 			{preview}
-		</button>
+		</div>
 	);
 }

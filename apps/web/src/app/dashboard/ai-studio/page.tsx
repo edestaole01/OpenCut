@@ -453,11 +453,14 @@ export default function AIStudioPage() {
 
 			{currentStep === 3 && analysisResult && (
 				<ClipsStep
+					key={videoUrl ?? ""}
 					clips={analysisResult.clips}
 					videoFile={videoFile}
 					videoUrl={videoUrl ?? undefined}
 					transcript={analysisResult.transcript}
 					transcriptSource={analysisResult.transcriptSource}
+					language={analysisResult.language}
+					initialWords={analysisResult.words}
 					isMock={Boolean(analysisResult.isMock)}
 					onBack={() => setCurrentStep(videoFile ? 2 : 1)}
 					onPublish={() => setCurrentStep(4)}

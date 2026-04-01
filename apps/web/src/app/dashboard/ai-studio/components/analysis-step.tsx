@@ -384,7 +384,7 @@ export function AnalysisStep({
 	const [progress, setProgress] = useState(0);
 	const [thumbCards, setThumbCards] = useState<ThumbCard[]>([]);
 	const [thumbsReady, setThumbsReady] = useState(false);
-	const [provider, setProvider] = useState<"gemini" | "groq">("gemini");
+	const provider = "groq";
 	const analysisStarted = useRef(false);
 
 	/** Extrai thumbnails assim que o componente monta */
@@ -493,11 +493,12 @@ export function AnalysisStep({
 			console.log(
 				"[Analysis] Starting transcription (Groq first, fallback local)...",
 			);
+			let transcriptionResult: any = null;
 			try {
 				const { samples, sampleRate } = await decodeAudioToFloat32({
 					audioBlob,
 				});
-				const transcription = await withTimeout({
+				transcriptionResult = await withTimeout({
 					promise: transcriptionService.transcribe({
 						audioData: audioBlob, // Passa o Blob original para o Groq
 						samples: samples, // Passa Float32Array para permitir fallback local se remoto falhar
@@ -516,16 +517,26 @@ export function AnalysisStep({
 				});
 
 				console.log("[Analysis] Transcription result received:", {
-					textLength: transcription.text?.length || 0,
-					language: transcription.language,
-					preview: transcription.text?.slice(0, 50),
+					textLength: transcriptionResult.text?.length || 0,
+					language: transcriptionResult.language,
+					segmentsCount: transcriptionResult.segments?.length || 0,
+					preview: transcriptionResult.text?.slice(0, 50),
 				});
 
-				const rawTranscript = transcription.text || "";
+				const rawTranscript = transcriptionResult.text || "";
 				const looksOnlyAudioCue = isAudioCueOnlyText(rawTranscript);
 				transcriptionText =
 					rawTranscript.length > 30 || !looksOnlyAudioCue ? rawTranscript : "";
-				transcriptionLanguage = transcription.language || "pt";
+				transcriptionLanguage = transcriptionResult.language || "pt";
+
+				// Phase 2: Word collection
+				const allWords = transcriptionResult.segments.flatMap((s: any) => s.words || []);
+				if (allWords.length > 0) {
+					console.log(
+						`[Analysis] Collected ${allWords.length} words for precision engine.`,
+					);
+				}
+
 				transcriptionText = ensureTimestampedTranscript(
 					transcriptionText,
 					videoDurationSec,
@@ -607,9 +618,18 @@ export function AnalysisStep({
 			const formData = new FormData();
 			formData.append("video", videoFile);
 			if (transcriptionText) formData.append("transcript", transcriptionText);
+
+			// Phase 2: WordMap transmission
+			if (transcriptionResult?.segments) {
+				const allWords = transcriptionResult.segments.flatMap((s: any) => s.words || []);
+				if (allWords.length > 0) {
+					formData.append("wordMapJson", JSON.stringify(allWords));
+				}
+			}
+
 			formData.append("language", transcriptionLanguage);
 			if (thumbnailBase64) formData.append("thumbnail", thumbnailBase64);
-			formData.append("provider", provider);
+		formData.append("provider", "groq");
 
 			const controller = new AbortController();
 			const timeoutId = window.setTimeout(() => controller.abort(), 120000);
@@ -738,46 +758,17 @@ export function AnalysisStep({
 							{/* Seletor de Provedor */}
 							<div className="flex flex-col items-center gap-3">
 								<p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
-									Escolha a Inteligência
+									Inteligência em uso
 								</p>
-								<div className="flex p-1 bg-muted rounded-xl border border-border/50 max-w-sm w-full">
-									<button
-										type="button"
-										onClick={() => setProvider("gemini")}
-										className={cn(
-											"flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all",
-											provider === "gemini"
-												? "bg-background text-primary shadow-sm"
-												: "text-muted-foreground hover:text-foreground",
-										)}
-									>
-										<Brain className="w-4 h-4" />
-										Google Gemini
-										<span className="text-[10px] bg-primary/10 text-primary px-1.5 rounded opacity-70">
-											Padrão
-										</span>
-									</button>
-									<button
-										type="button"
-										onClick={() => setProvider("groq")}
-										className={cn(
-											"flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all",
-											provider === "groq"
-												? "bg-background text-yellow-600 dark:text-yellow-500 shadow-sm"
-												: "text-muted-foreground hover:text-foreground",
-										)}
-									>
-										<Zap className="w-4 h-4 fill-current" />
-										Groq Llama
-										<span className="text-[10px] bg-yellow-500/10 text-yellow-600 px-1.5 rounded opacity-70">
-											Ultra Rápido
-										</span>
-									</button>
+								<div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-500/10 p-2 rounded-lg border border-amber-200 dark:border-amber-400/50 text-amber-800 dark:text-amber-200 text-sm font-medium">
+									<Zap className="w-4 h-4 fill-current" />
+									Groq Llama
+									<span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 rounded uppercase tracking-wide">
+										Ativo
+									</span>
 								</div>
-								<p className="text-[10px] text-muted-foreground italic">
-									{provider === "gemini"
-										? "Ideal para vídeos longos e análise visual profunda."
-										: "Ideal para cortes rápidos e análise de transcrição em alta velocidade."}
+								<p className="text-[10px] text-muted-foreground italic text-center">
+									Ideal para cortes rápidos e análise de transcrição em alta velocidade.
 								</p>
 							</div>
 

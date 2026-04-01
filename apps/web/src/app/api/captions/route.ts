@@ -9,13 +9,7 @@ import {
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
-const GEMINI_API_BASE = "https://generativelanguage.googleapis.com";
-const MODELS = [
-	"gemini-2.0-flash",
-	"gemini-1.5-flash",
-	"gemini-1.5-pro",
-	"gemini-flash-latest",
-];
+const GROQ_API_BASE = "https://api.groq.com/openai/v1";
 
 const PLATFORM_PROMPTS: Record<string, string> = {
 	linkedin: `Escreva uma caption profissional para LinkedIn.
@@ -54,30 +48,30 @@ const PLATFORM_PROMPTS: Record<string, string> = {
 - Se possível, termine com algo que gere reação`,
 };
 
-async function callGemini(
+async function callGroq(
 	prompt: string,
 	apiKey: string,
 ): Promise<string | null> {
-	for (const model of MODELS) {
-		try {
-			const res = await fetch(
-				`${GEMINI_API_BASE}/v1beta/models/${model}:generateContent?key=${apiKey}`,
-				{
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						contents: [{ parts: [{ text: prompt }] }],
-						generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
-					}),
-				},
-			);
-			if (!res.ok) continue;
-			const data = await res.json();
-			const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-			if (text) return text;
-		} catch {}
+	try {
+		const res = await fetch(`${GROQ_API_BASE}/chat/completions`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${apiKey}`,
+			},
+			body: JSON.stringify({
+				model: "llama-3.3-70b-versatile",
+				messages: [{ role: "user", content: prompt }],
+				temperature: 0.7,
+				response_format: { type: "text" },
+			}),
+		});
+		if (!res.ok) return null;
+		const data = await res.json();
+		return data.choices?.[0]?.message?.content ?? null;
+	} catch {
+		return null;
 	}
-	return null;
 }
 
 export async function POST(req: NextRequest) {
@@ -105,10 +99,10 @@ export async function POST(req: NextRequest) {
 		);
 	}
 
-	const apiKey = process.env.GEMINI_API_KEY;
+	const apiKey = process.env.GROQ_API_KEY;
 	if (!apiKey)
 		return NextResponse.json(
-			{ error: "GEMINI_API_KEY não configurada" },
+			{ error: "GROQ_API_KEY não configurada" },
 			{ status: 500 },
 		);
 
@@ -145,7 +139,7 @@ ${platformGuide}
 
 Gere a caption otimizada para ${platform}. Responda SOMENTE com a caption, sem explicações adicionais.`;
 
-	const generated = await callGemini(prompt, apiKey);
+	const generated = await callGroq(prompt, apiKey);
 
 	if (!generated) {
 		return NextResponse.json(
@@ -174,8 +168,8 @@ Gere a caption otimizada para ${platform}. Responda SOMENTE com a caption, sem e
 		.values({
 			id: nanoid(),
 			userId: session.user.id,
-			provider: "gemini",
-			model: "gemini-2.5-flash",
+			provider: "groq",
+			model: "llama-3.3-70b-versatile",
 			feature: "caption",
 		})
 		.catch(() => {});

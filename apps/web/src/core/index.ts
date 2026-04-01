@@ -9,10 +9,12 @@ import { SaveManager } from "./managers/save-manager";
 import { AudioManager } from "./managers/audio-manager";
 import { SelectionManager } from "./managers/selection-manager";
 import { registerDefaultEffects } from "@/lib/effects";
+import { EditorEventBus } from "./events";
 
 export class EditorCore {
 	private static instance: EditorCore | null = null;
 
+	public readonly events: EditorEventBus;
 	public readonly command: CommandManager;
 	public readonly playback: PlaybackManager;
 	public readonly timeline: TimelineManager;
@@ -26,6 +28,7 @@ export class EditorCore {
 
 	private constructor() {
 		registerDefaultEffects();
+		this.events = new EditorEventBus();
 		this.command = new CommandManager();
 		this.playback = new PlaybackManager(this);
 		this.timeline = new TimelineManager(this);
@@ -37,6 +40,27 @@ export class EditorCore {
 		this.audio = new AudioManager(this);
 		this.selection = new SelectionManager(this);
 		this.save.start();
+	}
+
+	public async initProject(projectId: string): Promise<void> {
+		try {
+			// Sequence of boot:
+			// 1. Pause save manager during boot
+			this.save.pause();
+			
+			// 2. Load the project data (ProjectManager)
+			// This will eventually emit PROJECT_LOADED
+			await this.project.loadProject({ id: projectId });
+			
+			// 3. Resume save manager
+			this.save.resume();
+			
+			console.log(`[EditorCore] Project ${projectId} initialized successfully.`);
+		} catch (error) {
+			console.error(`[EditorCore] Failed to initialize project ${projectId}:`, error);
+			this.save.resume();
+			throw error;
+		}
 	}
 
 	static getInstance(): EditorCore {

@@ -158,7 +158,7 @@ export const aiUsageLog = pgTable("ai_usage_log", {
 	userId: text("user_id")
 		.notNull()
 		.references(() => users.id, { onDelete: "cascade" }),
-	provider: text("provider").notNull(), // gemini, openai
+	provider: text("provider").notNull(), // groq
 	model: text("model").notNull(),
 	feature: text("feature").notNull(), // analyze, caption, translate
 	tokensUsed: integer("tokens_used"),

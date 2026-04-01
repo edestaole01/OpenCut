@@ -172,6 +172,9 @@ export class ProjectManager {
 					await this.saveCurrentProject();
 				}
 			}
+
+			// Emit event after all core data is loaded
+			this.editor.events.emit("PROJECT_LOADED", project);
 		} catch (error) {
 			console.error("Failed to load project:", error);
 			throw error;
