@@ -22,6 +22,39 @@ export class VideoCache {
 	private initPromises = new Map<string, Promise<void>>();
 	private operationQueues = new Map<string, Promise<void>>();
 
+	async prewarmAt({
+		mediaId,
+		file,
+		time,
+	}: {
+		mediaId: string;
+		file: File;
+		time: number;
+	}): Promise<void> {
+		await this.ensureSink({ mediaId, file });
+
+		const sinkData = this.sinks.get(mediaId);
+		if (!sinkData) return;
+
+		// Skip if already at or near the target time to avoid redundant seeks
+		if (
+			sinkData.currentFrame &&
+			Math.abs(sinkData.currentFrame.timestamp - time) < 0.1
+		) {
+			return;
+		}
+
+		void this.withMediaLock({
+			mediaId,
+			operation: async () => {
+				// Fire and forget seek to fill the buffers
+				await this.seekToTime({ sinkData, time });
+			},
+		}).catch((err) => {
+			console.warn(`[VideoCache] Prewarm failed for ${mediaId} at ${time}:`, err);
+		});
+	}
+
 	async getFrameAt({
 		mediaId,
 		file,

@@ -21,10 +21,11 @@ export class JumpCutEngine {
 		const sortedWords = [...words].sort((a, b) => a.start - b.start);
 
 		// The true start is the start of the first spoken word
-		const speechStart = sortedWords[0].start;
+		const PADDING = 0.15;
+		const speechStart = Math.max(0, sortedWords[0].start - PADDING);
 		
 		// The true end is the end of the last spoken word
-		const speechEnd = sortedWords[sortedWords.length - 1].end;
+		const speechEnd = sortedWords[sortedWords.length - 1].end + PADDING;
 
 		return {
 			start: speechStart,
@@ -35,12 +36,14 @@ export class JumpCutEngine {
 	/**
 	 * Identifies gaps between words that are longer than the threshold.
 	 * Returns a list of segments to be "cut out" from the timeline.
+	 * Includes padding to ensure smooth transitions.
 	 */
 	public static findSilenceGaps(
 		words: WordMetadata[],
 		minSilenceDuration = 0.5,
 	): Array<{ start: number; end: number }> {
 		const gaps: Array<{ start: number; end: number }> = [];
+		const PADDING = 0.15;
 
 		for (let i = 0; i < words.length - 1; i++) {
 			const current = words[i];
@@ -48,9 +51,10 @@ export class JumpCutEngine {
 			const silenceDuration = next.start - current.end;
 
 			if (silenceDuration >= minSilenceDuration) {
+				// We cut out the middle of the silence, leaving padding on both sides
 				gaps.push({
-					start: current.end,
-					end: next.start,
+					start: current.end + PADDING,
+					end: next.start - PADDING,
 				});
 			}
 		}

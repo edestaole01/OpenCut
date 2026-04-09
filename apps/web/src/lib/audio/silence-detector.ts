@@ -69,20 +69,42 @@ export async function detectSilenceFromAudioBuffer(
 	const totalSilence = silentSegments.reduce((s, seg) => s + seg.duration, 0);
 
 	const speechSegments: Array<{ start: number; end: number }> = [];
+	const PADDING = 0.15; // 150ms padding for natural speech cuts
+
 	let pos = 0;
 	for (const seg of silentSegments) {
 		if (seg.start > pos + 0.1) {
-			speechSegments.push({ start: pos, end: seg.start });
+			// Add padding to the start and end of speech
+			const start = Math.max(0, pos - (pos > 0 ? PADDING : 0));
+			const end = seg.start + PADDING;
+			speechSegments.push({ start, end });
 		}
 		pos = seg.end;
 	}
 	if (pos < duration - 0.1) {
-		speechSegments.push({ start: pos, end: duration });
+		const start = Math.max(0, pos - PADDING);
+		const end = Math.min(duration, duration);
+		speechSegments.push({ start, end });
+	}
+
+	// Post-process to merge overlapping segments caused by padding
+	const mergedSegments: Array<{ start: number; end: number }> = [];
+	if (speechSegments.length > 0) {
+		let current = { ...speechSegments[0] };
+		for (let i = 1; i < speechSegments.length; i++) {
+			if (speechSegments[i].start < current.end) {
+				current.end = Math.max(current.end, speechSegments[i].end);
+			} else {
+				mergedSegments.push(current);
+				current = { ...speechSegments[i] };
+			}
+		}
+		mergedSegments.push(current);
 	}
 
 	return {
 		silentSegments,
-		speechSegments,
+		speechSegments: mergedSegments,
 		totalSilence,
 		totalSpeech: duration - totalSilence,
 	};

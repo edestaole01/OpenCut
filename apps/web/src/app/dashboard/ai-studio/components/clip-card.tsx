@@ -309,26 +309,21 @@ export const ClipCard = memo(function ClipCard({
 								<Sparkles className="w-3 h-3" />
 								Caption IA
 							</Button>
-							<Button
-								size="sm"
-								variant={hasRefinedTranscript ? "secondary" : "default"}
-								className={cn(
-									"w-full text-xs h-7 gap-1 mt-1",
-									!hasRefinedTranscript && "bg-purple-600 hover:bg-purple-700 text-white"
-								)}
-								disabled={isRefining || isResolving}
-								onClick={(e) => {
-									e.stopPropagation();
-									onRefine?.(clip);
-								}}
-							>
+
+							{/* HD SYNC STATUS INDICATOR */}
+							<div className="w-full mt-1 px-2 py-1 rounded-md bg-muted/20 border border-border/30 flex items-center justify-between">
+								<span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter">Sincronia HD</span>
 								{isRefining ? (
-									<div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+									<div className="w-2.5 h-2.5 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />
+								) : hasRefinedTranscript ? (
+									<div className="flex items-center gap-1">
+										<span className="text-[9px] font-bold text-green-500 uppercase">Ativa</span>
+										<div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.6)]" />
+									</div>
 								) : (
-									<Sparkles className="w-3 h-3" />
+									<span className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-tighter">Aguardando</span>
 								)}
-								{hasRefinedTranscript ? "Legendas Refinadas" : "Refinar Legendas (HD)"}
-							</Button>
+							</div>
 						</div>
 					</div>
 				</div>

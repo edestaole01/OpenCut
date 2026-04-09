@@ -65,11 +65,12 @@ export class TimeController {
 			const videoTime = this.videoElement.currentTime;
 			const drift = Math.abs(videoTime - this.masterTime);
 
-			// If drift > 50ms, force sync master clock to video
-			if (drift > 0.05) {
+			// Tight sync: If drift > 20ms, force sync master clock to video
+			// This is essential for frame-accurate caption rendering.
+			if (drift > 0.02) {
 				this.masterTime = videoTime;
 			} else {
-				// Smoothly move master clock based on delta time
+				// Linear interpolation based on delta
 				const delta = (now - this.lastUpdate) / 1000;
 				this.masterTime += delta;
 			}

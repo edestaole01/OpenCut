@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useEditor } from "@/hooks/use-editor";
 import { useRafLoop } from "@/hooks/use-raf-loop";
 import { useContainerSize } from "@/hooks/use-container-size";
@@ -101,7 +101,9 @@ const RenderTreeController = memo(function RenderTreeController() {
 		height,
 		editor,
 		activeProject,
-		activeProject?.settings.background,
+		_tracksKey,
+		_mediaKey,
+		_backgroundKey,
 	]);
 
 	return null;
@@ -120,11 +122,17 @@ const PreviewCanvas = memo(function PreviewCanvas({
 	const lastFrameRef = useRef(-1);
 	const lastSceneRef = useRef<RootNode | null>(null);
 	const renderingRef = useRef(false);
+	const lastRenderedTimeRef = useRef(0);
+	const lagStateRef = useRef(false);
 	const { width: nativeWidth, height: nativeHeight } = usePreviewSize();
 	const containerSize = useContainerSize({ containerRef: outerContainerRef });
 	const editor = useEditor();
 	const activeProject = editor.project.getActive();
 	const bookmarksVisible = usePreviewStore((s) => s.overlays.bookmarks);
+	const [lagInfo, setLagInfo] = useState<{ isLagging: boolean; ms: number }>({
+		isLagging: false,
+		ms: 0,
+	});
 
 	const renderer = useMemo(() => {
 		return new CanvasRenderer({
@@ -174,6 +182,24 @@ const PreviewCanvas = memo(function PreviewCanvas({
 			});
 			const renderTime = Math.min(time, lastFrameTime);
 			const frame = Math.floor(renderTime * renderer.fps);
+			const lagThreshold = Math.max(0.1, 2 / renderer.fps); // at least 2 frames or 100ms
+			const deltaSinceLastRender = Math.max(
+				0,
+				time - lastRenderedTimeRef.current,
+			);
+			const isLaggingNow = deltaSinceLastRender > lagThreshold;
+
+			if (
+				isLaggingNow !== lagStateRef.current ||
+				(isLaggingNow &&
+					Math.abs(deltaSinceLastRender * 1000 - lagInfo.ms) > 15)
+			) {
+				lagStateRef.current = isLaggingNow;
+				setLagInfo({
+					isLagging: isLaggingNow,
+					ms: Math.round(deltaSinceLastRender * 1000),
+				});
+			}
 
 			if (
 				frame !== lastFrameRef.current ||
@@ -189,11 +215,12 @@ const PreviewCanvas = memo(function PreviewCanvas({
 						targetCanvas: canvasRef.current,
 					})
 					.then(() => {
+						lastRenderedTimeRef.current = renderTime;
 						renderingRef.current = false;
 					});
 			}
 		}
-	}, [renderer, renderTree, editor.playback]);
+	}, [renderer, renderTree, editor.playback, lagInfo.ms]);
 
 	useRafLoop(render);
 
@@ -228,6 +255,7 @@ const PreviewCanvas = memo(function PreviewCanvas({
 							containerRef={canvasBoundsRef}
 						/>
 						{bookmarksVisible && <BookmarkNoteOverlay />}
+						<LagIndicator lagInfo={lagInfo} />
 					</div>
 				</ContextMenuTrigger>
 				<PreviewContextMenu
@@ -235,6 +263,21 @@ const PreviewCanvas = memo(function PreviewCanvas({
 					containerRef={containerRef}
 				/>
 			</ContextMenu>
+		</div>
+	);
+});
+
+const LagIndicator = memo(function LagIndicator({
+	lagInfo,
+}: {
+	lagInfo: { isLagging: boolean; ms: number };
+}) {
+	if (!lagInfo.isLagging) return null;
+
+	return (
+		<div className="pointer-events-none absolute right-2 top-2 flex items-center gap-2 rounded-full bg-red-500/90 px-3 py-1 text-[11px] font-semibold uppercase text-white shadow-md">
+			<span className="inline-block h-2.5 w-2.5 rounded-full bg-white animate-pulse" />
+			<span>Atraso na prévia · {lagInfo.ms}ms</span>
 		</div>
 	);
 });

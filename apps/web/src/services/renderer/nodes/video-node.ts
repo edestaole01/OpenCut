@@ -13,6 +13,15 @@ export class VideoNode extends VisualNode<VideoNodeParams> {
 		await super.render({ renderer, time });
 
 		if (!this.isInRange({ time })) {
+			// Pre-warm: If the playhead is close to starting this clip, fetch the first frame in advance.
+			const secondsToStart = this.params.timeOffset - time;
+			if (secondsToStart > 0 && secondsToStart < 0.5) {
+				void videoCache.prewarmAt({
+					mediaId: this.params.mediaId,
+					file: this.params.file,
+					time: this.params.trimStart,
+				});
+			}
 			return;
 		}
 

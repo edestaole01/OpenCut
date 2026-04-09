@@ -138,11 +138,18 @@ export class PlaybackManager {
 		if (!this.isPlaying) return;
 
 		const now = performance.now();
-		const delta = (now - this.lastUpdate) / 1000;
-		this.lastUpdate = now;
-
 		const duration = this.editor.timeline.getTotalDuration();
-		let newTime = this.currentTime + delta;
+		let newTime: number;
+
+		// Use AudioContext time as the master clock if audio is active
+		// This prevents drift between what the user hears and what they see.
+		const audioTime = this.editor.audio?.getPlaybackTime?.();
+		if (audioTime !== undefined && audioTime > 0) {
+			newTime = audioTime;
+		} else {
+			const delta = (now - this.lastUpdate) / 1000;
+			newTime = this.currentTime + delta;
+		}
 
 		if (duration > 0 && newTime >= duration) {
 			newTime = duration;
@@ -150,6 +157,7 @@ export class PlaybackManager {
 		}
 
 		this.currentTime = newTime;
+		this.lastUpdate = now;
 		this.notify();
 
 		window.dispatchEvent(
